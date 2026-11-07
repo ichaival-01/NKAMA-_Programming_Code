@@ -14,7 +14,47 @@ pip install -r requirements.txt
 python -m uvicorn server:app --reload
 ```
 
-Open http://127.0.0.1:8000, click **Load sample requests**, then **Play**.
+There are two pages:
+
+| Page | Who it's for | What it does |
+|---|---|---|
+| http://127.0.0.1:8000/ | The public | Send a food request and follow **only your own** requests: progress steps, plain-language updates, arrival time, and your truck on the map |
+| http://127.0.0.1:8000/dispatch | Dispatch staff (password) | The full console: queue with score breakdowns, every crisis, the clock, road closures, breakdowns, fleet and stock, live event feed |
+
+### Dispatcher accounts
+
+Each teammate gets their own login. Run this once per person (it asks for
+the password twice, minimum 8 characters):
+
+```powershell
+python manage_users.py add aashi "Aashi"
+python manage_users.py list
+python manage_users.py remove aashi
+```
+
+Accounts are saved in `dispatchers.json`, which holds only salted password
+hashes (PBKDF2, 200,000 rounds), never the passwords. **Don't commit it**:
+it's listed in `.gitignore`. Each laptop that runs the server needs its own
+accounts (or a copy of the file passed around privately).
+
+Until the first account exists, a shared fallback login works: username
+`dispatcher`, password from `$env:DISPATCH_PASSWORD` (default `dispatch`).
+It switches off automatically once you add personal accounts.
+
+Other protections: sessions expire after 12 hours, and 5 wrong passwords
+from one computer lock it out for a minute. Console actions are signed with
+the person's name in the event feed, e.g. "Road closed: Bloor St by Aashi".
+
+For a quick demo: log in at `/dispatch`, click **Load sample requests**, then **Play**.
+Open `/` in another browser window to submit a request and watch it progress.
+
+**How the two sides stay separate.** Each request gets a tracking code like
+`R4-7F3A9C`. The public page only shows requests whose full code it holds
+(saved in that browser, or typed in), so ids like `R4` can't be guessed to
+spy on other requests. Every dispatcher API and the live WebSocket require
+the login cookie. The public view (`engine/public.py`) only exposes that one
+request's progress, never scores, other requests, stock or controls.
+Dispatchers can read a request's tracking code to someone who phoned it in.
 
 Use a different dataset (e.g. Dataset 2) without changing code:
 
@@ -24,6 +64,19 @@ python -m uvicorn server:app --reload
 ```
 
 Run the tests: `python -m pytest`
+
+## Requirements map
+
+| Requirement | Where it's met | Proven by |
+|---|---|---|
+| Crisis submission, all 9 fields incl. submission time, validation | `engine/crisis.py`, New request form | `test_crisis.py` |
+| Priority scoring (severity, people, food, deadline, location type, travel time), explainable | `engine/scoring.py`, Queue tab breakdown bars, Prioritized reason in each timeline | `test_scoring.py` |
+| Heap queue, updates on change, waiting-time aging, equal-priority rule | `engine/priority_queue.py`, re-scored every tick and on closures | `test_priority_queue.py`, `test_dispatcher.py` |
+| Dijkstra/A*, closures, alternatives, "route unavailable" | `engine/router.py`, re-routing in `dispatcher.py`, red "No route available" on the dashboard | `test_router.py`, `test_astar.py`, `test_dispatcher.py` |
+| Greedy matching (stock, capacity, refrigeration, urgency, route) without double-booking | `engine/matcher.py` + reservations | `test_matcher.py`, chaos test in `test_generality.py` |
+| All 9 states, valid transitions, Re-Routing only when needed, timestamp + reason on every change | `engine/states.py` (simulation time and real date-time logged) | `test_states.py`, `test_dispatcher.py` |
+| Pub/sub bus for all 7 events, shown live over WebSocket | `engine/events.py`; `server.py` subscribes the website and a terminal logger | `test_server.py` |
+| Works on a new dataset without code changes | `$env:DATASET`, `data/test-city.json` | `test_generality.py` |
 
 ## How it works
 
@@ -46,7 +99,13 @@ request → validate → score → priority queue → greedy match → A* route 
 | `engine/states.py` | The state machine; illegal transitions raise an error |
 | `engine/events.py` | Publish/subscribe event bus |
 | `engine/dispatcher.py` | Ties it all together on a simulation clock |
-| `server.py`, `static/` | FastAPI + WebSocket dashboard |
+| `engine/chaos.py` | Random closures, breakdowns and surprise requests, with recovery |
+| `engine/public.py` | Plain-language progress of one request, for the public page |
+| `auth.py`, `manage_users.py` | Dispatcher accounts, sessions, login lockout |
+| `server.py` | FastAPI: public endpoints, dispatcher login, WebSocket |
+| `static/public.*` | The public request and tracking page |
+| `static/index.html`, `app.js`, `style.css` | The dispatcher console |
+| `static/login.html` | Dispatcher login |
 | `config.json` | Scoring weights, aging rate, thresholds |
 
 ## Design decisions
@@ -87,6 +146,31 @@ when a road reopens. Failed when a request is still unserved
 `failure_grace` minutes after its deadline. Every change is logged with
 the simulation time and a reason.
 
+**Event bus.** The dispatcher only *publishes* events; it doesn't know who
+listens. The server *subscribes* twice: the website subscribes to every
+event and pushes each one to the browser over a WebSocket, and a terminal
+logger subscribes only to road closures, breakdowns, low stock and
+resolutions. Adding another listener (say, a text-message alert) means one
+more `subscribe` call, with no change to the engine.
+
+**Fuel.** Each truck's tank starts at the dataset's `fuel` value. Driving
+burns `per_km` units per km (set in `config.json`), charged road by road as
+the truck actually drives, including detours. The matcher never sends a
+truck that can't finish the whole trip. After a delivery, a truck below the
+`reserve` refuels where it is and is out of service for `refuel_minutes`
+(10 by default). If no truck can afford a trip, the suitable idle trucks go
+to refuel. Set `per_km` to 0 to switch fuel off. To see refuelling quickly
+in a demo, raise `per_km` (e.g. 15).
+
+**Chaos mode.** A toggle on the console (Low / Medium / High = 4 / 10 / 20
+incidents per simulated hour). While the clock runs, it randomly closes a
+road (often one a truck is about to use), breaks down a truck (often a busy
+one), or adds a surprise request. Roads reopen after 10–40 minutes and
+trucks are repaired after 15–45, so the city recovers. It never closes more
+than a seventh of the roads or leaves fewer than two working trucks.
+**Trigger incident** causes one immediately. Chaos actions appear in the
+feed as "by Chaos".
+
 **Breakdowns.** Before reaching the hub, the reserved food goes back into
 stock. After loading, the load is written off and the replacement truck
 collects fresh stock.
@@ -96,7 +180,8 @@ collects fresh stock.
 - One truck per request; a load bigger than any truck waits and fails.
   Splitting loads across trucks is a natural next step.
 - Food must come from a single hub.
-- Truck fuel is loaded but not used (the dataset doesn't define its unit).
+- The dataset doesn't define a fuel unit, so `per_km` is our assumption;
+  confirm with the coordinators. Trucks refuel where they stand.
 - Trucks re-route from the last intersection they passed.
 
 ## Datasets

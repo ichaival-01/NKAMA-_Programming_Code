@@ -37,6 +37,11 @@ DEFAULT_CONFIG = {
     "aging_rate": 0.2,                # queue: extra points per minute waited
     "low_stock_threshold": 50,        # warn when a hub's stock drops below this
     "failure_grace": 120,             # minutes past the deadline before giving up
+    "fuel": {
+        "per_km": 6.0,                # fuel units burned per km driven (0 = off)
+        "reserve": 25,                # refuel after a delivery when below this
+        "refuel_minutes": 10,         # how long a truck is out of service refuelling
+    },
 }
 
 

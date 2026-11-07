@@ -44,7 +44,7 @@ def test_submit_assigns_and_starts_delivery(d):
     r = d.submit(req())
     assert r.id == "R1"                       # id filled in automatically
     assert r.submitted_at == 0                # submitted "now"
-    assert states(d, "R1") == [st.PRIORITIZED, st.RESOURCE_ASSIGNED, st.IN_PROGRESS]
+    assert states(d, "R1") == [st.OPEN, st.PRIORITIZED, st.RESOURCE_ASSIGNED, st.IN_PROGRESS]
     assert d.assignments["R1"].truck_id == "V10"
     for e in (ev.CRISIS_CREATED, ev.PRIORITY_CHANGED, ev.ROUTE_UPDATED):
         assert e in event_types(d)
@@ -53,9 +53,12 @@ def test_submit_assigns_and_starts_delivery(d):
 def test_every_transition_has_time_and_reason(d):
     d.submit(req())
     d.advance(30)
-    for h in d.trackers["R1"].history:
+    history = d.trackers["R1"].history
+    assert history[0].to_state == st.OPEN          # arrival is logged too
+    for h in history:
         assert h.reason
         assert h.time >= 0
+        assert h.logged_at                         # real date and time as well
 
 
 def test_invalid_request_is_rejected_and_not_stored(d):
@@ -200,6 +203,8 @@ def test_new_request_to_unreachable_site_waits(d):
     d.submit(req(location=44))
     assert d.trackers["R1"].state == st.DELAYED
     assert "route" in d.waiting["R1"]
+    crisis = next(c for c in d.snapshot()["crises"] if c["request"]["id"] == "R1")
+    assert crisis["route_unavailable"] is True     # shown plainly on the dashboard
 
 
 # ---------- breakdowns ----------
