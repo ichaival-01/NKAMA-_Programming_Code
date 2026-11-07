@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Food Relief Dispatch</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <h1>Food relief dispatch</h1>
+      <p id="dataset-name" class="muted"></p>
+    </div>
+
+    <div class="clock" aria-live="off">
+      <span class="clock-label">Simulation time</span>
+      <span class="clock-value"><span id="clock">0.0</span> <small>min</small></span>
+    </div>
+
+    <div class="controls" role="group" aria-label="Simulation controls">
+      <button id="play" class="btn primary" aria-pressed="false">Play</button>
+      <label class="speed">
+        <span class="visually-hidden">Speed</span>
+        <select id="speed" aria-label="Minutes per second">
+          <option value="1">1 min/s</option>
+          <option value="2" selected>2 min/s</option>
+          <option value="5">5 min/s</option>
+        </select>
+      </label>
+      <button class="btn" data-skip="5">Skip 5 min</button>
+      <button class="btn" data-skip="15">Skip 15 min</button>
+      <button id="load-sample" class="btn" hidden>Load sample requests</button>
+      <button id="reset" class="btn ghost">Reset</button>
+    </div>
+  </header>
+
+  <main class="layout">
+    <section class="map-column">
+      <div id="map" aria-label="City map"></div>
+      <div class="map-hint muted">Click a road to close it, click again to reopen. Click a site to see its delivery.</div>
+      <section class="feed" aria-labelledby="feed-title">
+        <h2 id="feed-title">Event feed</h2>
+        <ol id="feed" class="feed-list"></ol>
+      </section>
+    </section>
+
+    <aside class="panel">
+      <nav class="tabs" role="tablist">
+        <button role="tab" class="tab" data-tab="queue" aria-selected="true">Queue <span id="count-queue" class="count">0</span></button>
+        <button role="tab" class="tab" data-tab="crises" aria-selected="false">Crises <span id="count-crises" class="count">0</span></button>
+        <button role="tab" class="tab" data-tab="new" aria-selected="false">New request</button>
+        <button role="tab" class="tab" data-tab="fleet" aria-selected="false">Fleet</button>
+      </nav>
+
+      <section id="tab-queue" class="tab-body" role="tabpanel">
+        <p class="muted small">Waiting requests, most urgent first. Priority is the triage score plus a boost for time spent waiting.</p>
+        <ol id="queue" class="queue"></ol>
+        <div id="queue-empty" class="empty">No one is waiting. Every request has a truck.</div>
+        <div class="score-key" id="score-key"></div>
+      </section>
+
+      <section id="tab-crises" class="tab-body" role="tabpanel" hidden>
+        <ul id="crises" class="crises"></ul>
+        <div id="crises-empty" class="empty">No emergencies yet. Add one under New request, or load the sample requests.</div>
+      </section>
+
+      <section id="tab-new" class="tab-body" role="tabpanel" hidden>
+        <form id="request-form" novalidate>
+          <label class="field">
+            <span>Location</span>
+            <select name="location" required></select>
+          </label>
+          <div class="row">
+            <label class="field">
+              <span>Crisis type</span>
+              <input name="crisis_type" placeholder="Flood, fire, outage…" required>
+            </label>
+            <label class="field">
+              <span>Location type</span>
+              <input name="location_category" list="categories" placeholder="Shelter" required>
+              <datalist id="categories"></datalist>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>People affected</span>
+              <input name="people_affected" type="number" min="1" step="1" required>
+            </label>
+            <label class="field">
+              <span>Food needed (units)</span>
+              <input name="food_needed" type="number" min="1" step="1" required>
+            </label>
+          </div>
+          <div class="row">
+            <label class="field">
+              <span>Severity</span>
+              <select name="severity">
+                <option value="1">1, low</option>
+                <option value="2">2</option>
+                <option value="3" selected>3, serious</option>
+                <option value="4">4</option>
+                <option value="5">5, critical</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Deadline (minutes from now)</span>
+              <input name="deadline_in" type="number" min="1" step="1" value="60" required>
+            </label>
+          </div>
+          <label class="check">
+            <input name="needs_refrigeration" type="checkbox">
+            <span>Needs refrigeration</span>
+          </label>
+          <ul id="form-errors" class="form-errors" role="alert"></ul>
+          <button class="btn primary wide" type="submit">Submit request</button>
+        </form>
+      </section>
+
+      <section id="tab-fleet" class="tab-body" role="tabpanel" hidden>
+        <h2 class="sub">Food stock</h2>
+        <table class="stock">
+          <thead><tr><th>Hub</th><th class="num">Normal</th><th class="num">Cold</th></tr></thead>
+          <tbody id="stock"></tbody>
+        </table>
+        <h2 class="sub">Trucks</h2>
+        <ul id="trucks" class="trucks"></ul>
+      </section>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>

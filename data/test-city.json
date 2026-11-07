@@ -1,0 +1,480 @@
+{
+  "id": "test-city",
+  "name": "Riverside Test City",
+  "center": [
+    49.8665,
+    -97.124
+  ],
+  "zoom": 14,
+  "nodes": [
+    {
+      "id": 100,
+      "name": "West Rd & North St",
+      "lat": 49.88,
+      "lng": -97.15
+    },
+    {
+      "id": 107,
+      "name": "Oak Ave & North St",
+      "lat": 49.88,
+      "lng": -97.137
+    },
+    {
+      "id": 114,
+      "name": "River Bridge Rd & North St",
+      "lat": 49.88,
+      "lng": -97.124
+    },
+    {
+      "id": 121,
+      "name": "East Way & North St",
+      "lat": 49.88,
+      "lng": -97.111
+    },
+    {
+      "id": 128,
+      "name": "West Rd & Mill St",
+      "lat": 49.871,
+      "lng": -97.15
+    },
+    {
+      "id": 135,
+      "name": "Oak Ave & Mill St",
+      "lat": 49.871,
+      "lng": -97.137
+    },
+    {
+      "id": 142,
+      "name": "River Bridge Rd & Mill St",
+      "lat": 49.871,
+      "lng": -97.124
+    },
+    {
+      "id": 149,
+      "name": "East Way & Mill St",
+      "lat": 49.871,
+      "lng": -97.111
+    },
+    {
+      "id": 156,
+      "name": "Quarry Ln & Mill St",
+      "lat": 49.871,
+      "lng": -97.098
+    },
+    {
+      "id": 163,
+      "name": "West Rd & Central St",
+      "lat": 49.862,
+      "lng": -97.15
+    },
+    {
+      "id": 170,
+      "name": "Oak Ave & Central St",
+      "lat": 49.862,
+      "lng": -97.137
+    },
+    {
+      "id": 177,
+      "name": "River Bridge Rd & Central St",
+      "lat": 49.862,
+      "lng": -97.124
+    },
+    {
+      "id": 184,
+      "name": "East Way & Central St",
+      "lat": 49.862,
+      "lng": -97.111
+    },
+    {
+      "id": 191,
+      "name": "Quarry Ln & Central St",
+      "lat": 49.862,
+      "lng": -97.098
+    },
+    {
+      "id": 198,
+      "name": "Oak Ave & South St",
+      "lat": 49.853,
+      "lng": -97.137
+    },
+    {
+      "id": 205,
+      "name": "River Bridge Rd & South St",
+      "lat": 49.853,
+      "lng": -97.124
+    },
+    {
+      "id": 212,
+      "name": "East Way & South St",
+      "lat": 49.853,
+      "lng": -97.111
+    },
+    {
+      "id": 219,
+      "name": "Quarry Ln & South St",
+      "lat": 49.853,
+      "lng": -97.098
+    }
+  ],
+  "edges": [
+    {
+      "id": 500,
+      "a": 100,
+      "b": 107,
+      "km": 1.006,
+      "w": 1.8862,
+      "street": "North St",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 503,
+      "a": 114,
+      "b": 121,
+      "km": 1.006,
+      "w": 1.8862,
+      "street": "North St",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 506,
+      "a": 128,
+      "b": 135,
+      "km": 1.0062,
+      "w": 1.8866,
+      "street": "Mill St",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 509,
+      "a": 135,
+      "b": 142,
+      "km": 1.0062,
+      "w": 1.8866,
+      "street": "Mill St",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 512,
+      "a": 142,
+      "b": 149,
+      "km": 1.0062,
+      "w": 1.8866,
+      "street": "Mill St",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 515,
+      "a": 149,
+      "b": 156,
+      "km": 1.0062,
+      "w": 1.8866,
+      "street": "Mill St",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 518,
+      "a": 163,
+      "b": 170,
+      "km": 1.0064,
+      "w": 0.8626,
+      "street": "Highway 9",
+      "hwy": true,
+      "terrain": "urban"
+    },
+    {
+      "id": 521,
+      "a": 177,
+      "b": 184,
+      "km": 1.0064,
+      "w": 0.8626,
+      "street": "Highway 9",
+      "hwy": true,
+      "terrain": "urban"
+    },
+    {
+      "id": 524,
+      "a": 184,
+      "b": 191,
+      "km": 1.0064,
+      "w": 0.8626,
+      "street": "Highway 9",
+      "hwy": true,
+      "terrain": "urban"
+    },
+    {
+      "id": 527,
+      "a": 198,
+      "b": 205,
+      "km": 1.0066,
+      "w": 1.8874,
+      "street": "South St",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 530,
+      "a": 205,
+      "b": 212,
+      "km": 1.0066,
+      "w": 1.8874,
+      "street": "South St",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 533,
+      "a": 212,
+      "b": 219,
+      "km": 1.0066,
+      "w": 1.8874,
+      "street": "South St",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 536,
+      "a": 100,
+      "b": 128,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "West Rd",
+      "hwy": false,
+      "terrain": "rural"
+    },
+    {
+      "id": 539,
+      "a": 128,
+      "b": 163,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "West Rd",
+      "hwy": false,
+      "terrain": "rural"
+    },
+    {
+      "id": 542,
+      "a": 107,
+      "b": 135,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "Oak Ave",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 545,
+      "a": 135,
+      "b": 170,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "Oak Ave",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 548,
+      "a": 170,
+      "b": 198,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "Oak Ave",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 551,
+      "a": 114,
+      "b": 142,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "River Bridge Rd",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 554,
+      "a": 142,
+      "b": 177,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "River Bridge Rd",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 557,
+      "a": 177,
+      "b": 205,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "River Bridge Rd",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 560,
+      "a": 121,
+      "b": 149,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "East Way",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 563,
+      "a": 149,
+      "b": 184,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "East Way",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 566,
+      "a": 184,
+      "b": 212,
+      "km": 1.0808,
+      "w": 2.0265,
+      "street": "East Way",
+      "hwy": false,
+      "terrain": "urban"
+    },
+    {
+      "id": 569,
+      "a": 156,
+      "b": 191,
+      "km": 1.0808,
+      "w": 3.6027,
+      "street": "Quarry Ln",
+      "hwy": false,
+      "terrain": "hill"
+    },
+    {
+      "id": 572,
+      "a": 191,
+      "b": 219,
+      "km": 1.0808,
+      "w": 3.6027,
+      "street": "Quarry Ln",
+      "hwy": false,
+      "terrain": "hill"
+    }
+  ],
+  "pois": [
+    {
+      "id": "H-A",
+      "name": "Westside Food Depot",
+      "kind": "hub",
+      "node": 128,
+      "address": "West Rd & Mill St",
+      "lat": 49.871,
+      "lng": -97.15
+    },
+    {
+      "id": "H-B",
+      "name": "Eastside Cold Store",
+      "kind": "hub",
+      "node": 184,
+      "address": "East Way & Central St",
+      "lat": 49.862,
+      "lng": -97.111
+    },
+    {
+      "id": "S-1",
+      "name": "Regional Hospital",
+      "kind": "hospital",
+      "node": 121,
+      "address": "East Way & North St",
+      "lat": 49.88,
+      "lng": -97.111
+    },
+    {
+      "id": "S-2",
+      "name": "Lakeview School shelter",
+      "kind": "school",
+      "node": 198,
+      "address": "Oak Ave & South St",
+      "lat": 49.853,
+      "lng": -97.137
+    },
+    {
+      "id": "S-3",
+      "name": "Quarry Clinic",
+      "kind": "clinic",
+      "node": 219,
+      "address": "Quarry Ln & South St",
+      "lat": 49.853,
+      "lng": -97.098
+    }
+  ],
+  "hubs": [
+    {
+      "poiId": "H-A",
+      "normal": 150,
+      "cold": 20
+    },
+    {
+      "poiId": "H-B",
+      "normal": 80,
+      "cold": 120
+    }
+  ],
+  "trucks": [
+    {
+      "id": "T-01",
+      "name": "Van West",
+      "home": 128,
+      "refrigerated": false,
+      "capacity": 50,
+      "fuel": 80
+    },
+    {
+      "id": "T-02",
+      "name": "Big Hauler",
+      "home": 128,
+      "refrigerated": false,
+      "capacity": 120,
+      "fuel": 200
+    },
+    {
+      "id": "T-03",
+      "name": "Chiller East",
+      "home": 184,
+      "refrigerated": true,
+      "capacity": 60,
+      "fuel": 90
+    },
+    {
+      "id": "T-04",
+      "name": "Van East",
+      "home": 184,
+      "refrigerated": false,
+      "capacity": 35,
+      "fuel": 60
+    },
+    {
+      "id": "T-05",
+      "name": "Chiller West",
+      "home": 107,
+      "refrigerated": true,
+      "capacity": 25,
+      "fuel": 40
+    }
+  ],
+  "terrain": [
+    {
+      "area": "Quarry Ln hills",
+      "type": "hill"
+    }
+  ],
+  "sources": [],
+  "disclosure": "Made-up test city for checking the system adapts to a new dataset. Not real roads."
+}
