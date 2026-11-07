@@ -1,4 +1,21 @@
-{}
-
-// Scoring weight goes here
-
+{
+  "weights": {
+    "severity": 30,
+    "people": 20,
+    "food": 10,
+    "deadline": 25,
+    "location": 15
+  },
+  "caps": {
+    "people": 500,
+    "food": 100,
+    "deadline_horizon": 240
+  },
+  "location_weights": {
+    "hospital": 1.0,
+    "shelter": 0.8,
+    "community": 0.6
+  },
+  "default_location_weight": 0.5,
+  "aging_rate": 0.2
+}

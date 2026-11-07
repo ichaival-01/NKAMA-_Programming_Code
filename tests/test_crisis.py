@@ -85,6 +85,14 @@ def test_location_not_in_dataset(good, dataset):
     assert any("location" in e for e in errors)
 
 
+@pytest.mark.parametrize("bad", [True, 22.0, "22"])
+def test_location_must_be_a_whole_number(good, dataset, bad):
+    # True == 1 and 22.0 == 22 in Python, so "in dataset.nodes" alone lets them in.
+    good["location"] = bad
+    errors = errors_for(good, dataset)
+    assert any("location" in e for e in errors)
+
+
 @pytest.mark.parametrize("bad", [0, 6, -1, "high", 3.5, True])
 def test_bad_severity(good, dataset, bad):
     good["severity"] = bad

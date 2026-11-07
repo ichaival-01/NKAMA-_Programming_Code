@@ -1,0 +1,29 @@
+{
+  "description": "Sample emergency requests for the Toronto dataset. submitted_at and deadline are minutes on the simulation clock; requests with a future submitted_at appear when the clock reaches them.",
+  "requests": [
+    {"id": "R101", "location": 34, "crisis_type": "power outage", "location_category": "hospital",
+     "people_affected": 400, "food_needed": 35, "needs_refrigeration": true,
+     "severity": 5, "deadline": 45, "submitted_at": 0},
+    {"id": "R102", "location": 22, "crisis_type": "cold snap", "location_category": "shelter",
+     "people_affected": 180, "food_needed": 50, "needs_refrigeration": false,
+     "severity": 4, "deadline": 60, "submitted_at": 0},
+    {"id": "R103", "location": 4, "crisis_type": "flood", "location_category": "community",
+     "people_affected": 90, "food_needed": 25, "needs_refrigeration": false,
+     "severity": 3, "deadline": 120, "submitted_at": 0},
+    {"id": "R104", "location": 44, "crisis_type": "building fire", "location_category": "community",
+     "people_affected": 60, "food_needed": 20, "needs_refrigeration": true,
+     "severity": 4, "deadline": 50, "submitted_at": 5},
+    {"id": "R105", "location": 17, "crisis_type": "water main break", "location_category": "community",
+     "people_affected": 250, "food_needed": 40, "needs_refrigeration": false,
+     "severity": 2, "deadline": 180, "submitted_at": 10},
+    {"id": "R106", "location": 30, "crisis_type": "cold snap", "location_category": "shelter",
+     "people_affected": 120, "food_needed": 30, "needs_refrigeration": true,
+     "severity": 4, "deadline": 70, "submitted_at": 15},
+    {"id": "R107", "location": 41, "crisis_type": "supply shortage", "location_category": "community",
+     "people_affected": 320, "food_needed": 60, "needs_refrigeration": false,
+     "severity": 3, "deadline": 150, "submitted_at": 20},
+    {"id": "R108", "location": 26, "crisis_type": "power outage", "location_category": "hospital",
+     "people_affected": 500, "food_needed": 40, "needs_refrigeration": true,
+     "severity": 5, "deadline": 55, "submitted_at": 25}
+  ]
+}
