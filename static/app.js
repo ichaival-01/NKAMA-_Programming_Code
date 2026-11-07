@@ -18,6 +18,7 @@ const EVENT_CLASS = {
   "road-closed": "ev-bad", "vehicle-breakdown": "ev-bad",
   "resource-depleted": "ev-warn",
   "route-updated": "ev-active", "road-opened": "ev-active",
+  "vehicle-refuelling": "ev-warn", "vehicle-ready": "ev-ok", "chaos-toggled": "ev-bad",
 };
 const POI_COLORS = { hub: "#1c2b33", hospital: "#c8323c", shelter: "#6b4fa3", community: "#2e8b57" };
 const OTHER_POI = "#8a6d3b";   // any kind a new dataset introduces
@@ -50,6 +51,10 @@ async function api(url, options = {}) {
   const res = await fetch(url, {
     headers: { "Content-Type": "application/json" }, ...options,
   });
+  if (res.status === 401) {                // session ended: back to the login page
+    location.href = "/dispatch";
+    throw new Error("Please log in again");
+  }
   let data = null;
   try { data = await res.json(); } catch (e) { /* empty body */ }
   if (!res.ok) {
@@ -182,8 +187,9 @@ function drawOverlays() {
       m.setIcon(icon);
     }
     const job = t.request_id ? `<br>On ${esc(t.request_id)}` : "";
+    const fuel = state.fuel_on ? `<br>Fuel ${Math.round(t.fuel)} of ${Math.round(t.max_fuel)}` : "";
     m.bindTooltip(`<strong>${esc(t.name)}</strong><br>${t.fridge ? "Refrigerated, " : ""}` +
-                  `holds ${t.capacity}<br>${esc(t.status)}${job}`);
+                  `holds ${t.capacity}<br>${esc(t.status)}${job}${fuel}`);
   });
 }
 
@@ -245,9 +251,12 @@ function crisisCard(c) {
   } else {
     detail = `Deadline ${mins(r.deadline)} min`;
   }
+  if (c.route_unavailable && !["Resolved", "Failed"].includes(c.state)) {
+    detail = `<span class="no-route">No route available.</span> ${detail}`;
+  }
   const open = r.id === selected;
   const timeline = open ? `<ol class="timeline">${c.history.map((h) => `
-      <li class="${STATE_CLASS[h.to_state]}">
+      <li class="${STATE_CLASS[h.to_state]}" title="Logged ${esc(h.logged_at.replace("T", " "))}">
         <span class="when">${mins(h.time)}</span><span class="state">${esc(h.to_state)}</span>
         <span class="reason">${esc(h.reason)}</span>
       </li>`).join("")}</ol>` : "";
@@ -257,6 +266,7 @@ function crisisCard(c) {
       <span class="badge ${cls}">${esc(c.state)}</span>
       <span class="detail">${r.people_affected} people, ${r.food_needed} units${r.needs_refrigeration ? " cold" : ""}, severity ${r.severity}</span>
       <span class="detail">${detail}</span>
+      ${c.tracking_code ? `<span class="detail">Tracking code <span class="code">${esc(c.tracking_code)}</span></span>` : ""}
     </button>
     ${timeline}
   </li>`;
@@ -268,7 +278,13 @@ function renderCrises() {
     order[STATE_CLASS[a.state]] - order[STATE_CLASS[b.state]] ||
     a.request.deadline - b.request.deadline);
   $("#crises").innerHTML = sorted.map(crisisCard).join("");
-  $("#crises-empty").hidden = state.crises.length > 0;
+  $("#crises-empty").hidden = state.crises.length > 0 || state.scheduled.length > 0;
+  const later = $("#scheduled");
+  later.hidden = state.scheduled.length === 0;
+  later.textContent = state.scheduled.length
+    ? "Scheduled: " + state.scheduled.map((s) =>
+        `${s.id} at ${s.location_name}, arrives at ${mins(s.submitted_at)} min`).join("; ")
+    : "";
   const open = state.crises.filter((c) => !["Resolved", "Failed"].includes(c.state)).length;
   $("#count-crises").textContent = open;
 }
@@ -281,13 +297,19 @@ function renderFleet() {
       <td class="num ${s.cold < low ? "low" : ""}">${s.cold}</td></tr>`).join("");
   $("#trucks").innerHTML = state.trucks.map((t) => {
     const job = t.status === "busy" ? `on ${esc(t.request_id)}` :
-                t.status === "broken" ? "broken down" : "available";
+                t.status === "broken" ? "broken down" :
+                t.status === "refuelling" ? `refuelling until ${mins(t.ready_at)} min` : "available";
+    const share = t.max_fuel ? Math.max(0, Math.min(1, t.fuel / t.max_fuel)) : 1;
+    const fuelBar = state.fuel_on ? `
+        <span class="fuel" role="img" aria-label="Fuel ${Math.round(share * 100)}%">
+          <span class="${share < 0.1 ? "empty" : share < 0.3 ? "low" : ""}" style="width:${share * 100}%"></span></span>
+        <span class="meta">Fuel ${Math.round(t.fuel)} of ${Math.round(t.max_fuel)}</span>` : "";
     const action = t.status === "broken"
       ? `<button class="btn small" data-repair="${esc(t.id)}">Repair</button>`
       : `<button class="btn small" data-breakdown="${esc(t.id)}">Break down</button>`;
     return `<li>
       <div><div class="name">${esc(t.name)} (${esc(t.id)})</div>
-        <div class="meta">${t.fridge ? "Refrigerated, " : ""}holds ${t.capacity}, ${job}</div></div>
+        <div class="meta">${t.fridge ? "Refrigerated, " : ""}holds ${t.capacity}, ${job}</div>${fuelBar}</div>
       ${action}
     </li>`;
   }).join("");
@@ -305,9 +327,18 @@ function renderFeed() {
   lastEventCount = state.events.length;
 }
 
+function renderChaos() {
+  const on = state.chaos.enabled;
+  const toggle = $("#chaos-toggle");
+  toggle.textContent = on ? "Chaos on" : "Chaos off";
+  toggle.setAttribute("aria-pressed", String(on));
+  if (document.activeElement !== $("#chaos-level")) $("#chaos-level").value = state.chaos.level;
+}
+
 function render(newState) {
   state = newState;
   $("#clock").textContent = mins(state.now);
+  renderChaos();
   renderQueue();
   renderCrises();
   renderFleet();
@@ -364,6 +395,8 @@ $("#request-form").addEventListener("submit", async (event) => {
   form.querySelectorAll("[aria-invalid]").forEach((el) => el.removeAttribute("aria-invalid"));
   const num = (v) => (v === "" ? null : Number(v));
   const deadlineIn = num(f("deadline_in").value);
+  const submittedAt = num(f("submitted_at").value);
+  const start = submittedAt === null ? state.now : submittedAt;
   const body = {
     location: num(f("location").value),
     crisis_type: f("crisis_type").value.trim(),
@@ -372,15 +405,19 @@ $("#request-form").addEventListener("submit", async (event) => {
     food_needed: num(f("food_needed").value),
     needs_refrigeration: f("needs_refrigeration").checked,
     severity: num(f("severity").value),
-    deadline: deadlineIn === null ? null : state.now + deadlineIn,
+    deadline: deadlineIn === null ? null : start + deadlineIn,
   };
+  if (submittedAt !== null) body.submitted_at = submittedAt;   // blank = server uses "now"
   try {
     const res = await api("/api/requests", { method: "POST", body: JSON.stringify(body) });
     $("#form-errors").innerHTML = "";
     f("crisis_type").value = "";
     f("people_affected").value = "";
     f("food_needed").value = "";
-    toast(`Request ${res.id} submitted`);
+    f("submitted_at").value = "";
+    toast(res.scheduled
+      ? `Request ${res.id} scheduled for ${mins(res.submitted_at)} min. Tracking code ${res.code}`
+      : `Request ${res.id} submitted. Tracking code ${res.code}`);
     selected = res.id;
     showTab("crises");
   } catch (err) {
@@ -397,7 +434,8 @@ $("#request-form").addEventListener("submit", async (event) => {
       return text.charAt(0).toUpperCase() + text.slice(1);
     };
     $("#form-errors").innerHTML = errors.map((e) => `<li>${esc(readable(e))}</li>`).join("");
-    const fields = { deadline: "deadline_in" };
+    const fields = { deadline: "deadline_in", submitted_at: "submitted_at" };
+    body.submitted_at = body.submitted_at === undefined ? null : body.submitted_at;
     errors.forEach((e) => {
       Object.keys(body).forEach((k) => {
         if (e.includes(k)) {
@@ -446,6 +484,37 @@ $("#reset").addEventListener("click", async () => {
   toast("Simulation reset");
 });
 
+$("#chaos-toggle").addEventListener("click", async () => {
+  const on = !state.chaos.enabled;
+  try {
+    render(await api("/api/chaos", { method: "POST",
+      body: JSON.stringify({ enabled: on, level: $("#chaos-level").value }) }));
+    toast(on ? "Chaos mode on. Incidents happen while the clock runs." : "Chaos mode off");
+  } catch (err) { toast(err.message); }
+});
+
+$("#chaos-level").addEventListener("change", async () => {
+  if (!state.chaos.enabled) return;
+  try {
+    render(await api("/api/chaos", { method: "POST",
+      body: JSON.stringify({ enabled: true, level: $("#chaos-level").value }) }));
+  } catch (err) { toast(err.message); }
+});
+
+$("#chaos-now").addEventListener("click", async () => {
+  try {
+    const res = await api("/api/chaos/trigger", { method: "POST" });
+    render(res.state);
+    toast(res.incident);
+  } catch (err) { toast(err.message); }
+});
+
+$("#logout").addEventListener("click", async () => {
+  stopPlaying();
+  await fetch("/api/logout", { method: "POST" });
+  location.href = "/dispatch";
+});
+
 $("#load-sample").addEventListener("click", async () => {
   try {
     const res = await api("/api/requests/sample", { method: "POST" });
@@ -480,13 +549,24 @@ function connect() {
   const proto = location.protocol === "https:" ? "wss" : "ws";
   const ws = new WebSocket(`${proto}://${location.host}/ws`);
   ws.onmessage = (msg) => {
+    // Each message carries the events the server's event-bus subscriber just
+    // received, plus the state they produced.
     const data = JSON.parse(msg.data);
-    if (data.kind === "state") render(data.state);
+    if (data.kind === "update") {
+      if (data.events.length) lastEventCount = Math.max(0, data.state.events.length - data.events.length);
+      render(data.state);
+    }
   };
-  ws.onclose = () => setTimeout(connect, 1500);   // reconnect if the server restarts
+  ws.onclose = (e) => {
+    if (e.code === 1008) { location.href = "/dispatch"; return; }   // not logged in
+    setTimeout(connect, 1500);   // reconnect if the server restarts
+  };
 }
 
 async function init() {
+  const me = await api("/api/me");
+  $("#who").textContent = me.name;
+  if (me.fallback_account) toast("Using the shared fallback login. Create personal accounts with manage_users.py");
   const data = await api("/api/map");
   $("#dataset-name").textContent = data.name;
   $("#load-sample").hidden = !data.has_sample_requests;

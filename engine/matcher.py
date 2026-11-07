@@ -33,18 +33,29 @@ class Assignment:
     arrival_time: float    # now + travel_time
     on_time: bool          # arrival_time <= deadline
     reason: str            # plain-language explanation for the dashboard
+    km: float = 0.0        # distance of both legs, for fuel
 
 
 @dataclass
 class NoMatch:
     request_id: str
     reason: str            # why nothing could be assigned
-    kind: str = "other"    # "stock", "truck" or "route", so callers can react
+    kind: str = "other"    # "stock", "truck", "fuel" or "route", so callers can react
+
+
+def route_km(graph, route):
+    return sum(graph.edges[eid].km for eid in route.edge_ids)
 
 
 class ResourcePool:
-    def __init__(self, dataset):
+    def __init__(self, dataset, fuel_per_km=0.0):
         self.dataset = dataset
+        # Fuel: a truck's tank starts at the dataset's "fuel" value. Driving
+        # burns fuel_per_km for every km. 0 switches fuel off entirely.
+        self.fuel_per_km = fuel_per_km
+        self.max_fuel = {tid: float(t.fuel) for tid, t in dataset.trucks.items()}
+        self.fuel = dict(self.max_fuel)
+        self.refuelling = {}   # truck id -> simulation time it's ready again
         # Copy the stock, so the original dataset is never changed.
         self.stock = {
             hub_id: {"normal": hub.normal, "cold": hub.cold}
@@ -56,7 +67,11 @@ class ResourcePool:
         self.broken = set()    # trucks out of service after a breakdown
 
     def is_free(self, truck_id):
-        return truck_id not in self.busy and truck_id not in self.broken
+        return (truck_id not in self.busy and truck_id not in self.broken
+                and truck_id not in self.refuelling)
+
+    def fuel_needed(self, km):
+        return km * self.fuel_per_km
 
     def reserve(self, a):
         """Lock in an assignment: take the food, mark the truck busy."""
@@ -82,6 +97,7 @@ class ResourcePool:
     def break_down(self, truck_id, location):
         """Take a truck out of service where it stopped."""
         self.busy.pop(truck_id, None)
+        self.refuelling.pop(truck_id, None)
         self.broken.add(truck_id)
         self.truck_location[truck_id] = location
 
@@ -115,6 +131,7 @@ def find_match(req, pool, graph, now):
     # 3. Try every hub + truck pair and keep the best one
     truck_order = list(ds.trucks)        # for a stable final tie-break
     best = None                          # (sort_key, hub_id, truck_id, to_hub, to_site)
+    short_of_fuel = False
     for hub_id in hubs:
         hub_node = ds.pois[hub_id].node
         to_site = shortest_path(graph, hub_node, req.location)
@@ -125,6 +142,11 @@ def find_match(req, pool, graph, now):
             to_hub = shortest_path(graph, pool.truck_location[truck_id], hub_node)
             if to_hub is None:
                 continue
+            # Never send a truck that can't finish the whole trip
+            km = route_km(graph, to_hub) + route_km(graph, to_site)
+            if pool.fuel[truck_id] + 1e-9 < pool.fuel_needed(km):
+                short_of_fuel = True
+                continue
             total = to_hub.cost + to_site.cost
             # Smaller is better: fastest, then don't waste a reefer on a
             # normal job, then the smallest truck that fits, then file order.
@@ -134,6 +156,9 @@ def find_match(req, pool, graph, now):
                 best = (key, hub_id, truck_id, to_hub, to_site)
 
     if best is None:
+        if short_of_fuel:
+            return NoMatch(req.id, "Suitable trucks don't have enough fuel for this trip",
+                           kind="fuel")
         return NoMatch(req.id, "No route from any suitable hub and truck to the site",
                        kind="route")
 
@@ -148,4 +173,5 @@ def find_match(req, pool, graph, now):
         on_time=arrival <= req.deadline,
         reason=(f"{ds.trucks[truck_id].name} via {ds.pois[hub_id].name}: "
                 f"fastest suitable option ({travel_time:.1f} min)"),
+        km=route_km(graph, to_hub) + route_km(graph, to_site),
     )

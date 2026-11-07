@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Food Relief Dispatch</title>
+  <title>Dispatcher console | Food Relief Dispatch</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
@@ -13,8 +13,9 @@
 <body>
   <header class="topbar">
     <div class="brand">
-      <h1>Food relief dispatch</h1>
-      <p id="dataset-name" class="muted"></p>
+      <h1>Dispatcher console</h1>
+      <p class="muted"><span id="dataset-name"></span> <a class="top-link" href="/" target="_blank" rel="noopener">Public request page</a></p>
+      <p class="muted signed-in">Signed in as <strong id="who"></strong></p>
     </div>
 
     <div class="clock" aria-live="off">
@@ -35,7 +36,17 @@
       <button class="btn" data-skip="5">Skip 5 min</button>
       <button class="btn" data-skip="15">Skip 15 min</button>
       <button id="load-sample" class="btn" hidden>Load sample requests</button>
+      <div class="chaos" role="group" aria-label="Chaos mode">
+        <button id="chaos-toggle" class="btn" aria-pressed="false">Chaos off</button>
+        <select id="chaos-level" aria-label="Chaos level">
+          <option value="low">Low</option>
+          <option value="medium" selected>Medium</option>
+          <option value="high">High</option>
+        </select>
+        <button id="chaos-now" class="btn" title="Cause one random incident right now">Trigger incident</button>
+      </div>
       <button id="reset" class="btn ghost">Reset</button>
+      <button id="logout" class="btn ghost">Log out</button>
     </div>
   </header>
 
@@ -65,6 +76,7 @@
       </section>
 
       <section id="tab-crises" class="tab-body" role="tabpanel" hidden>
+        <p id="scheduled" class="muted small" hidden></p>
         <ul id="crises" class="crises"></ul>
         <div id="crises-empty" class="empty">No emergencies yet. Add one under New request, or load the sample requests.</div>
       </section>
@@ -108,10 +120,15 @@
               </select>
             </label>
             <label class="field">
-              <span>Deadline (minutes from now)</span>
+              <span>Deadline (minutes after submission)</span>
               <input name="deadline_in" type="number" min="1" step="1" value="60" required>
             </label>
           </div>
+          <label class="field">
+            <span>Submission time (simulation minutes)</span>
+            <input name="submitted_at" type="number" min="0" step="0.1" placeholder="Now" aria-describedby="submitted-hint">
+            <small id="submitted-hint" class="muted">Leave blank for now. A later time holds the request until the clock reaches it.</small>
+          </label>
           <label class="check">
             <input name="needs_refrigeration" type="checkbox">
             <span>Needs refrigeration</span>

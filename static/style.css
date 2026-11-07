@@ -55,6 +55,22 @@ h1, h2 { font-family: var(--head); font-weight: 600; margin: 0; }
 }
 .brand h1 { font-size: 22px; letter-spacing: 0.01em; }
 .brand p { margin: 0; color: #a9bac0; font-size: 14px; }
+.top-link { color: #fff; margin-left: 10px; }
+.signed-in strong { color: #fff; font-weight: 600; }
+
+.chaos { display: flex; gap: 6px; padding-left: 6px; border-left: 1px solid #4a5d66; }
+.chaos select {
+  font: 500 14px var(--body); padding: 7px 6px; border-radius: 4px;
+  border: 1px solid #4a5d66; background: var(--ink); color: #fff;
+}
+#chaos-toggle[aria-pressed="true"] { background: var(--red); border-color: var(--red); color: #fff; }
+
+.fuel { display: block; width: 120px; height: 6px; border-radius: 3px; background: #dfe6e3; margin-top: 4px; overflow: hidden; }
+.fuel span { display: block; height: 100%; background: var(--green); }
+.fuel span.low { background: var(--amber-bright); }
+.fuel span.empty { background: var(--red); }
+.truck-tag.refuelling { background: var(--amber-bright); color: var(--ink); }
+.code { font-variant-numeric: tabular-nums; letter-spacing: 0.04em; color: var(--ink); }
 
 .clock {
   display: flex;
@@ -267,6 +283,8 @@ h1, h2 { font-family: var(--head); font-weight: 600; margin: 0; }
 .crisis .title { font-weight: 600; }
 .crisis .detail { grid-column: 1 / 3; font-size: 14px; color: var(--muted); }
 .crisis.selected { box-shadow: 0 0 0 2px var(--ink); }
+.crisis .no-route { color: var(--red); font-weight: 600; }
+.field small { font-weight: 400; font-size: 13px; }
 
 .badge {
   font: 600 13px/1 var(--head);

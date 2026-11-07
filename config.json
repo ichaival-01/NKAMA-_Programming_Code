@@ -17,5 +17,10 @@
     "community": 0.6
   },
   "default_location_weight": 0.5,
-  "aging_rate": 0.2
+  "aging_rate": 0.2,
+  "fuel": {
+    "per_km": 6.0,
+    "reserve": 25,
+    "refuel_minutes": 10
+  }
 }

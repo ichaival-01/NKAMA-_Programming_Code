@@ -7,7 +7,8 @@ over a WebSocket, so the dashboard updates live.
 """
 from __future__ import annotations  # lets newer type hints work on Python 3.8
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
+from datetime import datetime
 
 CRISIS_CREATED = "crisis-created"
 PRIORITY_CHANGED = "priority-changed"
@@ -18,10 +19,13 @@ ROAD_OPENED = "road-opened"
 VEHICLE_BREAKDOWN = "vehicle-breakdown"
 CRISIS_RESOLVED = "crisis-resolved"
 STATE_CHANGED = "state-changed"
+VEHICLE_REFUELLING = "vehicle-refuelling"
+VEHICLE_READY = "vehicle-ready"
+CHAOS_TOGGLED = "chaos-toggled"
 
 EVENT_TYPES = [CRISIS_CREATED, PRIORITY_CHANGED, ROUTE_UPDATED, RESOURCE_DEPLETED,
                ROAD_CLOSED, ROAD_OPENED, VEHICLE_BREAKDOWN, CRISIS_RESOLVED,
-               STATE_CHANGED]
+               STATE_CHANGED, VEHICLE_REFUELLING, VEHICLE_READY, CHAOS_TOGGLED]
 
 
 @dataclass
@@ -30,6 +34,8 @@ class Event:
     time: float          # simulation minutes
     message: str         # plain-language summary for the event feed
     data: dict
+    logged_at: str = field(
+        default_factory=lambda: datetime.now().isoformat(timespec="seconds"))
 
 
 class EventBus:

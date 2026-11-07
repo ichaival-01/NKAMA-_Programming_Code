@@ -15,6 +15,8 @@ Simplifications worth knowing (and saying out loud to judges):
 - If a truck breaks down before reaching the hub, its reserved food goes back
   into the hub's stock. If it already loaded the food, that load is written
   off and the replacement truck collects fresh stock.
+- Fuel is burned per km as each road is driven. A truck refuels where it is
+  (a fuel truck comes to it) and is out of service while it does.
 """
 from __future__ import annotations  # lets newer type hints work on Python 3.8
 
@@ -23,6 +25,7 @@ from dataclasses import asdict, dataclass, field
 
 from engine import events as ev
 from engine import states as st
+from engine.chaos import Chaos
 from engine.crisis import RequestError, validate_request
 from engine.events import EventBus
 from engine.graph import Graph
@@ -41,6 +44,7 @@ class Trip:
     node_times: list       # simulation time the truck reaches each node
     hub_index: int         # position of the hub in `nodes` (-1 once already loaded)
     late_flagged: bool = False
+    fuel_charged: int = 0  # how many roads of this trip have been paid for in fuel
 
     @property
     def arrival(self):
@@ -84,7 +88,9 @@ class Dispatcher:
         self.config = config or load_config()
         self.bus = bus or EventBus()
         self.graph = Graph(dataset)
-        self.pool = ResourcePool(dataset)
+        self.fuel_config = self.config.get("fuel", {})
+        self.pool = ResourcePool(dataset, self.fuel_config.get("per_km", 0.0))
+        self.chaos = Chaos(self.config.get("chaos_seed"))
         self.queue = CrisisQueue(self.config["aging_rate"])
         self.now = 0.0
 
@@ -111,6 +117,10 @@ class Dispatcher:
         tracker.move_to(new_state, self.now, reason)
         self._publish(ev.STATE_CHANGED, f"{rid}: {old} → {new_state}. {reason}",
                       request_id=rid, from_state=old, to_state=new_state, reason=reason)
+
+    @staticmethod
+    def _by(by):
+        return f" by {by}" if by else ""
 
     def _node_name(self, node_id):
         return self.dataset.nodes[node_id].name
@@ -186,6 +196,9 @@ class Dispatcher:
         rid = req.id
         self.requests[rid] = req
         self.trackers[rid] = st.CrisisTracker(rid)
+        self.trackers[rid].record_open(
+            self.now, f"Request received (submitted at {req.submitted_at:.1f} min) "
+                      f"and passed validation")
         self._publish(ev.CRISIS_CREATED,
                       f"{rid}: {req.crisis_type} at {self._node_name(req.location)}, "
                       f"{req.people_affected} people, {req.food_needed} units"
@@ -219,6 +232,8 @@ class Dispatcher:
                 if first_time and result.kind == "stock":
                     self._publish(ev.RESOURCE_DEPLETED, f"{rid}: {result.reason}",
                                   request_id=rid)
+                if result.kind == "fuel":
+                    self._refuel_for(req)
         for rid in deferred:
             self.queue.push(rid, self.scores[rid].total, self.requests[rid].submitted_at)
         self._last_order = self.queue.ordered()
@@ -265,18 +280,26 @@ class Dispatcher:
         if minutes < 0:
             raise ValueError("Can't move the clock backwards")
         target = self.now + minutes
+        self.chaos.plan(self.now, target)
         while True:
             due = [t.arrival for t in self.trips.values() if t.arrival <= target]
             due += [r.submitted_at for r in self.scheduled if r.submitted_at <= target]
+            due += [t for t in self.pool.refuelling.values() if t <= target]
+            due += self.chaos.due_times(target)
             due = [t for t in due if t > self.now - 1e-9]
             if not due:
                 break
             self.now = max(self.now, min(due))
+            self.chaos.run_due(self)
             self._tick()
         self.now = target
+        self.chaos.run_due(self)
         self._tick()
 
     def _tick(self):
+        self._finish_refuelling()
+        for trip in self.trips.values():
+            self._burn_fuel(trip)
         self._deliver_due()
         self._release_scheduled()
         for rid in list(self.trips):
@@ -290,9 +313,11 @@ class Dispatcher:
             if trip.arrival > self.now + 1e-9:
                 continue
             del self.trips[rid]
+            self._burn_fuel(trip)
             a = self.assignments[rid]
             req = self.requests[rid]
             self.pool.complete(a, req.location)
+            self._maybe_refuel(a.truck_id)
             late = trip.arrival - req.deadline
             timing = "on time" if late <= 0 else f"{late:.1f} min late"
             self._move(rid, st.DELIVERED,
@@ -341,20 +366,20 @@ class Dispatcher:
         self._last_order = order
 
     # ------------------------------------------------------------ disruptions
-    def close_road(self, edge_id):
+    def close_road(self, edge_id, by=None):
         if edge_id in self.graph.closed_edges:
             return
         self.graph.close_edge(edge_id)                    # raises for unknown roads
         edge = self.graph.edges[edge_id]
         self._publish(ev.ROAD_CLOSED, f"Road closed: {edge.street or 'road'} "
-                      f"(edge {edge_id})", edge_id=edge_id)
+                      f"(edge {edge_id}){self._by(by)}", edge_id=edge_id, by=by)
         for rid, trip in list(self.trips.items()):
             if edge_id in trip.remaining_edges(self.now):
                 self._reroute(rid, edge_id)
         self._rescore()
         self.dispatch()
 
-    def open_road(self, edge_id):
+    def open_road(self, edge_id, by=None):
         if edge_id not in self.graph.edges:
             raise ValueError(f"Unknown edge: {edge_id}")
         if edge_id not in self.graph.closed_edges:
@@ -362,7 +387,7 @@ class Dispatcher:
         self.graph.open_edge(edge_id)
         edge = self.graph.edges[edge_id]
         self._publish(ev.ROAD_OPENED, f"Road reopened: {edge.street or 'road'} "
-                      f"(edge {edge_id})", edge_id=edge_id)
+                      f"(edge {edge_id}){self._by(by)}", edge_id=edge_id, by=by)
         for rid in list(self.stuck):
             self._resume(rid)
         self._rescore()
@@ -384,6 +409,7 @@ class Dispatcher:
 
     def _reroute(self, rid, edge_id):
         trip = self.trips.pop(rid)
+        self._burn_fuel(trip)
         here = trip.nodes[trip.index_at(self.now)]
         loaded = trip.has_loaded(self.now)
         a = self.assignments[rid]
@@ -423,7 +449,7 @@ class Dispatcher:
         del self.stuck[rid]
         self._continue_from(rid, here, loaded)
 
-    def break_down(self, truck_id):
+    def break_down(self, truck_id, by=None):
         if truck_id not in self.dataset.trucks:
             raise ValueError(f"Unknown truck: {truck_id}")
         if truck_id in self.pool.broken:
@@ -433,14 +459,16 @@ class Dispatcher:
         loaded = False
         if rid in self.trips:
             trip = self.trips.pop(rid)
+            self._burn_fuel(trip)
             here = trip.nodes[trip.index_at(self.now)]
             loaded = trip.has_loaded(self.now)
         elif rid in self.stuck:
             here, loaded = self.stuck.pop(rid)
         self.pool.break_down(truck_id, here)
         self._publish(ev.VEHICLE_BREAKDOWN,
-                      f"{self._truck_name(truck_id)} broke down at {self._node_name(here)}",
-                      truck_id=truck_id, node=here)
+                      f"{self._truck_name(truck_id)} broke down at "
+                      f"{self._node_name(here)}{self._by(by)}",
+                      truck_id=truck_id, node=here, by=by)
         if rid is not None:
             a = self.assignments.pop(rid)
             if not loaded:
@@ -452,11 +480,68 @@ class Dispatcher:
             self.queue.push(rid, self._score(rid).total, self.requests[rid].submitted_at)
         self.dispatch()
 
-    def repair(self, truck_id):
+    def repair(self, truck_id, by=None):
         if truck_id not in self.dataset.trucks:
             raise ValueError(f"Unknown truck: {truck_id}")
-        self.pool.repair(truck_id)
+        if truck_id in self.pool.broken:
+            self.pool.repair(truck_id)
+            self._publish(ev.VEHICLE_READY,
+                          f"{self._truck_name(truck_id)} repaired{self._by(by)}",
+                          truck_id=truck_id, by=by)
         self.dispatch()
+
+    # ------------------------------------------------------------ fuel
+    def _burn_fuel(self, trip):
+        """Charge fuel for the roads this trip has driven since the last charge."""
+        done = trip.index_at(self.now)
+        km = sum(self.graph.edges[e].km for e in trip.edge_ids[trip.fuel_charged:done])
+        trip.fuel_charged = max(trip.fuel_charged, done)
+        tid = trip.truck_id
+        self.pool.fuel[tid] = max(0.0, self.pool.fuel[tid] - self.pool.fuel_needed(km))
+
+    def _start_refuel(self, truck_id, why):
+        minutes = self.fuel_config.get("refuel_minutes", 10)
+        ready = self.now + minutes
+        self.pool.refuelling[truck_id] = ready
+        self._publish(ev.VEHICLE_REFUELLING,
+                      f"{self._truck_name(truck_id)} is refuelling ({why}); "
+                      f"back at {ready:.1f} min",
+                      truck_id=truck_id, ready_at=ready,
+                      fuel=round(self.pool.fuel[truck_id], 1))
+
+    def _maybe_refuel(self, truck_id):
+        """After a delivery, refuel if the tank is below the reserve."""
+        if self.pool.fuel_per_km <= 0:
+            return
+        if self.pool.fuel[truck_id] < self.fuel_config.get("reserve", 25):
+            self._start_refuel(truck_id, f"{self.pool.fuel[truck_id]:.0f} fuel left")
+
+    def _refuel_for(self, req):
+        """No truck can afford this trip: refuel the idle trucks that would suit it."""
+        for tid, truck in self.dataset.trucks.items():
+            if (self.pool.is_free(tid) and truck.capacity >= req.food_needed
+                    and (truck.fridge or not req.needs_refrigeration)
+                    and self.pool.fuel[tid] < self.pool.max_fuel[tid]):
+                self._start_refuel(tid, f"needed for {req.id}")
+
+    def _finish_refuelling(self):
+        for tid, ready in list(self.pool.refuelling.items()):
+            if ready <= self.now + 1e-9:
+                del self.pool.refuelling[tid]
+                self.pool.fuel[tid] = self.pool.max_fuel[tid]
+                self._publish(ev.VEHICLE_READY,
+                              f"{self._truck_name(tid)} refuelled and ready",
+                              truck_id=tid)
+
+    # ------------------------------------------------------------ chaos
+    def set_chaos(self, enabled, level=None, by=None):
+        self.chaos.set(enabled, level)
+        state = f"on ({self.chaos.level})" if enabled else "off"
+        self._publish(ev.CHAOS_TOGGLED, f"Chaos mode {state}{self._by(by)}",
+                      enabled=enabled, level=self.chaos.level, by=by)
+
+    def trigger_chaos(self):
+        return self.chaos.trigger(self)
 
     # ------------------------------------------------------------ for the dashboard
     def truck_position(self, truck_id):
@@ -508,16 +593,23 @@ class Dispatcher:
                 "route": trip.nodes[trip.index_at(self.now):] if trip else [],
                 "eta": round(trip.arrival, 2) if trip else None,
                 "waiting": self.waiting.get(rid, ""),
+                # True when roads make delivery impossible right now
+                "route_unavailable": (rid in self.stuck or
+                                      "route" in self.waiting.get(rid, "").lower()),
             })
         trucks = []
         for tid, t in ds.trucks.items():
             lat, lng = self.truck_position(tid)
             status = ("broken" if tid in self.pool.broken
+                      else "refuelling" if tid in self.pool.refuelling
                       else "busy" if tid in self.pool.busy else "free")
             trucks.append({
                 "id": tid, "name": t.name, "fridge": t.fridge, "capacity": t.capacity,
                 "status": status, "request_id": self.pool.busy.get(tid),
                 "lat": lat, "lng": lng,
+                "fuel": round(self.pool.fuel[tid], 1),
+                "max_fuel": self.pool.max_fuel[tid],
+                "ready_at": self.pool.refuelling.get(tid),
             })
         return {
             "now": round(self.now, 2),
@@ -527,6 +619,10 @@ class Dispatcher:
             "stock": [{"hub_id": h, "name": ds.pois[h].name, **s}
                       for h, s in self.pool.stock.items()],
             "closed_edges": sorted(self.graph.closed_edges),
-            "scheduled": len(self.scheduled),
+            "chaos": self.chaos.status(),
+            "fuel_on": self.pool.fuel_per_km > 0,
+            "scheduled": [{"id": r.id, "submitted_at": r.submitted_at,
+                           "location_name": ds.nodes[r.location].name}
+                          for r in sorted(self.scheduled, key=lambda r: r.submitted_at)],
             "events": [asdict(e) for e in self.bus.history[-60:]],
         }

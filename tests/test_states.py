@@ -18,6 +18,17 @@ def test_starts_open():
     assert t.history == []
 
 
+def test_open_is_logged_with_time_and_reason():
+    t = CrisisTracker("R1")
+    t.record_open(4.5, "Request received")
+    assert t.state == st.OPEN
+    assert (t.history[0].time, t.history[0].to_state) == (4.5, st.OPEN)
+    assert t.history[0].reason == "Request received"
+    assert t.history[0].logged_at          # real date and time
+    with pytest.raises(InvalidTransition):
+        t.record_open(5, "again")
+
+
 def test_happy_path_is_allowed_and_logged():
     t = CrisisTracker("R1")
     path = [st.PRIORITIZED, st.RESOURCE_ASSIGNED, st.IN_PROGRESS, st.DELIVERED, st.RESOLVED]

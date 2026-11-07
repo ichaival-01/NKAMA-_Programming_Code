@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Request emergency food</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600;700&display=swap">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="/static/public.css">
+</head>
+<body>
+  <header class="masthead">
+    <div class="wrap">
+      <h1>Emergency food requests</h1>
+      <p id="city" class="sub"></p>
+    </div>
+  </header>
+
+  <main class="wrap layout">
+    <section class="mine" aria-labelledby="mine-title">
+      <h2 id="mine-title">Your requests</h2>
+      <div id="requests" aria-live="polite"></div>
+      <p id="no-requests" class="empty">Requests you send from this device appear here, with live progress.</p>
+      <div id="map-card" class="map-card" hidden>
+        <div id="map" aria-label="Map of your delivery"></div>
+        <p class="map-key"><span class="k site"></span>Your location <span class="k truck"></span>Your truck <span class="k route"></span>Its route</p>
+      </div>
+      <form id="track-form" class="track">
+        <label for="track-code">Have a tracking code?</label>
+        <div class="track-row">
+          <input id="track-code" placeholder="For example R4-7F3A9C" autocomplete="off">
+          <button class="btn quiet" type="submit">Track</button>
+        </div>
+        <p id="track-error" class="error" role="alert"></p>
+      </form>
+    </section>
+
+    <section class="ask" aria-labelledby="ask-title">
+      <h2 id="ask-title">Request food</h2>
+      <form id="request-form" novalidate>
+        <label class="field">
+          <span>Where is the food needed?</span>
+          <select name="location" required></select>
+        </label>
+        <div class="row">
+          <label class="field">
+            <span>What happened?</span>
+            <input name="crisis_type" placeholder="Flood, fire, power outage…" required>
+          </label>
+          <label class="field">
+            <span>What kind of place is it?</span>
+            <input name="location_category" list="categories" placeholder="Shelter" required>
+            <datalist id="categories"></datalist>
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>How many people need food?</span>
+            <input name="people_affected" type="number" min="1" step="1" inputmode="numeric" required>
+          </label>
+          <label class="field">
+            <span>How much food? (units)</span>
+            <input name="food_needed" type="number" min="1" step="1" inputmode="numeric" required>
+          </label>
+        </div>
+        <fieldset class="field severity">
+          <legend>How serious is it?</legend>
+          <div class="choices">
+            <label><input type="radio" name="severity" value="1"><span><strong>1</strong> Can wait</span></label>
+            <label><input type="radio" name="severity" value="2"><span><strong>2</strong> Soon</span></label>
+            <label><input type="radio" name="severity" value="3" checked><span><strong>3</strong> Serious</span></label>
+            <label><input type="radio" name="severity" value="4"><span><strong>4</strong> Urgent</span></label>
+            <label><input type="radio" name="severity" value="5"><span><strong>5</strong> Critical</span></label>
+          </div>
+        </fieldset>
+        <label class="field">
+          <span>Needed within (minutes)</span>
+          <input name="deadline_in" type="number" min="1" step="1" value="60" inputmode="numeric" required>
+        </label>
+        <label class="check">
+          <input name="needs_refrigeration" type="checkbox">
+          <span>Some of the food must stay cold (for example milk or medicine)</span>
+        </label>
+        <ul id="form-errors" class="errors" role="alert"></ul>
+        <button class="btn main" type="submit">Send request</button>
+        <p class="fine">The time you send it is recorded automatically.</p>
+      </form>
+    </section>
+  </main>
+
+  <div id="sent" class="sent" role="dialog" aria-modal="true" aria-labelledby="sent-title" hidden>
+    <div class="sent-box">
+      <h2 id="sent-title">Request sent</h2>
+      <p>Your tracking code is</p>
+      <p id="sent-code" class="sent-code"></p>
+      <p class="fine">This device will keep showing its progress. Write the code down to check from another phone or computer.</p>
+      <button id="sent-ok" class="btn main">Show my request</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="/static/public.js"></script>
+</body>
+</html>
