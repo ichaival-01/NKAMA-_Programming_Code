@@ -1,28 +1,19 @@
-"""Crisis state machine (goal 5).
-
-Every emergency moves through these states. Only the transitions listed in
-ALLOWED are legal; anything else raises InvalidTransition, which catches
-logic bugs early instead of letting a request end up in a nonsense state.
-Every change is logged with the simulation time and a plain-language reason.
-
-    OPEN -> PRIORITIZED -> RESOURCE_ASSIGNED -> IN_PROGRESS -> DELIVERED -> RESOLVED
-                 |                 |                |  ^
-                 v                 v                v  |
-              DELAYED  <------  (no resources,   RE_ROUTING  (only when a road
-                 |               running late)                on the route closes)
-                 v
-              FAILED   (deadline long gone, or the site can't be reached)
-"""
-from __future__ import annotations  # lets newer type hints work on Python 3.8
-
+#=======================================================================================================================
 from dataclasses import dataclass, field
 from datetime import datetime
 
+#Imports dataclass/field for the records and datetime for real timestamps
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _wall_clock():
     """Real date and time, logged alongside the simulation time."""
     return datetime.now().isoformat(timespec="seconds")
 
+#Real date and time, logged next to the simulation time on every change
+#=======================================================================================================================
+
+#=======================================================================================================================
 OPEN = "Open"
 PRIORITIZED = "Prioritized"
 RESOURCE_ASSIGNED = "Resource Assigned"
@@ -36,6 +27,10 @@ FAILED = "Failed"
 ALL_STATES = [OPEN, PRIORITIZED, RESOURCE_ASSIGNED, IN_PROGRESS, RE_ROUTING,
               DELIVERED, RESOLVED, DELAYED, FAILED]
 
+#The nine states a request can be in, and a list of all of them
+#=======================================================================================================================
+
+#=======================================================================================================================
 ALLOWED = {
     OPEN:              {PRIORITIZED, FAILED},
     PRIORITIZED:       {RESOURCE_ASSIGNED, DELAYED, FAILED},
@@ -52,11 +47,17 @@ ALLOWED = {
 
 FINAL_STATES = {RESOLVED, FAILED}
 
+#The state machine: which states each state may move to. Resolved and Failed are final
+#=======================================================================================================================
 
+#=======================================================================================================================
 class InvalidTransition(Exception):
     pass
 
+#Error raised for a move the state machine doesn't allow
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class Transition:
     time: float          # simulation minutes
@@ -65,22 +66,37 @@ class Transition:
     reason: str
     logged_at: str = field(default_factory=_wall_clock)   # real date and time
 
+#One logged state change: sim time, from, to, reason and real date/time
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class CrisisTracker:
     request_id: str
     state: str = OPEN
     history: list = field(default_factory=list)   # list of Transition
 
+#Tracks one request's current state and its full history of changes
+#=======================================================================================================================
+
+#=======================================================================================================================
     def record_open(self, time, reason):
         """Log the starting Open state, so arrival has a timestamp and reason too."""
         if self.history:
             raise InvalidTransition(f"{self.request_id} is already being tracked")
         self.history.append(Transition(time, "", OPEN, reason))
 
+#Logs the starting Open state, so arrival also has a time and reason
+#=======================================================================================================================
+
+#=======================================================================================================================
     def can_move_to(self, new_state):
         return new_state in ALLOWED[self.state]
 
+#True if the move is allowed from the current state
+#=======================================================================================================================
+
+#=======================================================================================================================
     def move_to(self, new_state, time, reason):
         if new_state not in ALLOWED:
             raise InvalidTransition(f"Unknown state: {new_state!r}")
@@ -91,6 +107,13 @@ class CrisisTracker:
         self.history.append(Transition(time, self.state, new_state, reason))
         self.state = new_state
 
+#Checks the move is allowed, logs it with its time and reason, then changes the state
+#=======================================================================================================================
+
+#=======================================================================================================================
     @property
     def is_finished(self):
         return self.state in FINAL_STATES
+
+#True once the request is Resolved or Failed
+#=======================================================================================================================

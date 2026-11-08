@@ -1,35 +1,22 @@
-"""Shortest routes: Dijkstra and A* (goal 4).
-
-shortest_path() uses A*. dijkstra() is your teammate's original algorithm,
-kept for comparison: the tests check both always give the same cost.
-
-How A* differs from Dijkstra: Dijkstra explores outward in every direction.
-A* adds a guess of the remaining time to each node's priority, so it
-explores toward the goal first and usually visits far fewer nodes.
-
-The guess (the "heuristic") must NEVER overestimate the real remaining time,
-or A* can return a worse route. Ours is:
-
-    straight-line distance to the goal / fastest straight-line speed on any road
-
-No road can be faster than the fastest road, and no route can be shorter than
-a straight line, so the guess is always at or below the truth. The speed is
-measured from the data itself (straight-line length / travel time of each
-road), so nothing is hardcoded and Dataset 2 works as-is. If a dataset had no
-coordinates, the guess becomes 0 and A* behaves exactly like Dijkstra.
-"""
+#=======================================================================================================================
 import heapq
 import math
 from dataclasses import dataclass
 
+#Imports heapq for the priority queues, math for the straight-line distance, and dataclass for Route
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class Route:
     nodes: list      # node ids from start to goal
     edge_ids: list   # edges used, in order
     cost: float      # total cost (travel time from "w")
 
+#A finished route: the nodes and roads in order, plus the total travel time
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _straight_line_km(n1, n2):
     """Great-circle (haversine) distance in km between two nodes."""
     r = 6371.0
@@ -39,7 +26,10 @@ def _straight_line_km(n1, n2):
     h = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
     return 2 * r * math.asin(math.sqrt(h))
 
+#Haversine formula: straight-line distance in km between two points on the Earth's surface
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _max_speed(graph):
     """Fastest straight-line km per cost unit over all roads (cached on the graph)."""
     speed = getattr(graph, "_astar_max_speed", None)
@@ -51,19 +41,30 @@ def _max_speed(graph):
         graph._astar_max_speed = speed
     return speed
 
+#Fastest straight-line km per minute over every road, measured once from the data and saved on the graph. This keeps
+#the A* guess from ever overestimating
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _heuristic(graph, node, goal):
     speed = _max_speed(graph)
     if speed <= 0:
         return 0.0
     return _straight_line_km(graph.nodes[node], graph.nodes[goal]) / speed
 
+#A*'s guess of the time left: straight-line distance / fastest speed. It's never more than the real time, so A* still
+#finds the best route
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _check_nodes(graph, start, goal):
     if start not in graph.nodes or goal not in graph.nodes:
         raise ValueError(f"Unknown node: start={start}, goal={goal}")
 
+#Raises an error if the start or goal isn't a node on the map
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _rebuild(prev, start, goal, cost):
     """Walk backwards from the goal to the start using prev."""
     nodes = []
@@ -79,7 +80,10 @@ def _rebuild(prev, start, goal, cost):
     edge_ids.reverse()
     return Route(nodes, edge_ids, cost)
 
+#Rebuilds the route by following prev from the goal back to the start, then reversing it
+#=======================================================================================================================
 
+#=======================================================================================================================
 def dijkstra(graph, start, goal):
     """Your teammate's Dijkstra. Returns a Route, or None if no route exists."""
     _check_nodes(graph, start, goal)
@@ -107,7 +111,11 @@ def dijkstra(graph, start, goal):
         return None              # route unavailable
     return _rebuild(prev, start, goal, dist[goal])
 
+#Dijkstra: a heap always expands the cheapest node found so far, skipping closed roads and stale heap entries. Kept to
+#compare against A*
+#=======================================================================================================================
 
+#=======================================================================================================================
 def astar(graph, start, goal):
     """A*: Dijkstra plus a guess of the remaining time. Same result, less searching."""
     _check_nodes(graph, start, goal)
@@ -138,7 +146,14 @@ def astar(graph, start, goal):
         return None
     return _rebuild(prev, start, goal, dist[goal])
 
+#A*: same as Dijkstra, but the heap is sorted by cost so far + guess of the rest, so it searches toward the goal. Same
+#answer, fewer nodes searched
+#=======================================================================================================================
 
+#=======================================================================================================================
 def shortest_path(graph, start, goal):
     """The route everything else uses. Returns a Route, or None if unreachable."""
     return astar(graph, start, goal)
+
+#The one route function the rest of the program calls (uses A*). None if the goal can't be reached
+#=======================================================================================================================

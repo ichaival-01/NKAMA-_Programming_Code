@@ -1,13 +1,10 @@
-"""What the public sees about one request.
-
-The public page must never show other people's requests, scores, or the
-dispatcher's controls. This module turns the dispatcher's internal record of
-ONE request into plain-language progress for the person who submitted it.
-"""
-from __future__ import annotations  # lets newer type hints work on Python 3.8
-
+#=======================================================================================================================
 from engine import states as st
 
+#Imports the state names so the public page can translate them
+#=======================================================================================================================
+
+#=======================================================================================================================
 # The progress bar on the public page: a real sequence, in order.
 STEPS = ["Received", "In the queue", "Truck assigned", "On the way", "Delivered"]
 
@@ -23,7 +20,10 @@ TITLES = {
     st.FAILED: "Could not be delivered",
 }
 
+#The five steps of the public progress bar, and the plain-language title shown for each internal state
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _explain(transition):
     """Turn an internal state change into a sentence for the public."""
     state, reason = transition.to_state, transition.reason
@@ -63,7 +63,11 @@ def _explain(transition):
                 "contact local emergency services.")
     return reason
 
+#Turns an internal state change into a friendly sentence for the public, picked using keywords in the reason (no scores
+#or internal details)
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _step_index(tracker):
     """How far along the progress bar this request has got."""
     reached = 0
@@ -78,7 +82,10 @@ def _step_index(tracker):
             reached = 4
     return reached
 
+#How far along the progress bar the request has got, based on the furthest state it has reached
+#=======================================================================================================================
 
+#=======================================================================================================================
 def public_status(d, request_id, code):
     """Plain-language status of one request, or None if it doesn't exist."""
     ds = d.dataset
@@ -141,3 +148,7 @@ def public_status(d, request_id, code):
         "finished": tracker.is_finished,
         "problem": tracker.state in (st.DELAYED, st.RE_ROUTING, st.FAILED),
     }
+
+#Builds everything the public page shows for one request: step, message, queue position, truck location, arrival time
+#and timeline. None if the request doesn't exist
+#=======================================================================================================================

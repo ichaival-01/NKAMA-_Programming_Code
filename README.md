@@ -370,3 +370,11 @@ collects fresh stock.
 - `data/test-city.json`: a made-up city that differs on purpose
   (non-sequential ids, new location types, highways and hills, a river with
   two bridges, fewer hubs and trucks) to show the system adapts.
+
+
+### AI DISCLAIMER
+
+- The project was built using the assistance of Generative AI to help explain, debug and rebuild
+  portions of the project. This disclaimer is to demonstrate full transparency with the 
+  development life-cycle and credit Anthropic's Claude AI for assisting in the 
+  completion of the project.s

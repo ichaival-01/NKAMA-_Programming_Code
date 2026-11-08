@@ -1,19 +1,12 @@
-"""Triage scoring (goal 2, part 1).
-
-Every request gets a score from 0 to 100, made of five parts. Each part is a
-fraction from 0 to 1, multiplied by that part's weight. The weights add up to
-100, so the score reads like a percentage, and the breakdown answers the
-judges' question "why is this request ahead of that one?".
-
-The score does not do any routing itself: the caller passes in travel_time
-(minutes from the nearest suitable hub), which keeps this easy to test.
-"""
-from __future__ import annotations  # lets newer type hints work on Python 3.8
-
+#=======================================================================================================================
 import copy
 import json
 from dataclasses import dataclass
 
+#Imports copy to duplicate the defaults, json to read config.json, and dataclass for Score
+#=======================================================================================================================
+
+#=======================================================================================================================
 # Defaults. config.json can override any of these without changing code.
 DEFAULT_CONFIG = {
     "weights": {               # max points per part; these add up to 100
@@ -44,7 +37,10 @@ DEFAULT_CONFIG = {
     },
 }
 
+#Default settings for scoring, the queue, stock warnings, failure and fuel. config.json can override any of them
+#=======================================================================================================================
 
+#=======================================================================================================================
 def load_config(path=None):
     """Return the defaults, with any sections from a JSON file merged on top."""
     config = copy.deepcopy(DEFAULT_CONFIG)    # never change the defaults themselves
@@ -59,13 +55,19 @@ def load_config(path=None):
             config[key] = value
     return config
 
+#Returns a copy of the defaults with any settings from config.json merged on top (a whole section or a single value)
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class Score:
     total: float
     parts: dict        # part name -> points, e.g. {"severity": 22.5, ...}
 
+#A score's total and its breakdown per part, shown on the dashboard
+#=======================================================================================================================
 
+#=======================================================================================================================
 def score_request(req, now, travel_time, config):
     """Score a CrisisRequest at simulation time `now` (minutes)."""
     weights = config["weights"]
@@ -95,3 +97,7 @@ def score_request(req, now, travel_time, config):
     parts["location"] = weights["location"] * location_weight
 
     return Score(total=sum(parts.values()), parts=parts)
+
+#Urgency score out of 100: severity, people and food scaled to their caps, deadline points from the spare time left
+#after travel, and location points from the location type's weight
+#=======================================================================================================================
