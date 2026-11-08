@@ -1,18 +1,19 @@
-"""Emergency requests: the data format and validation (goal 1).
-
-validate_request() works on a plain dict, so the same check is used whether a
-request comes from the website form, a JSON file, or a test.
-"""
-from __future__ import annotations  # lets newer type hints work on Python 3.8
-
+#=======================================================================================================================
 from dataclasses import dataclass
 
+#Imports dataclass for the CrisisRequest record
+#=======================================================================================================================
+
+#=======================================================================================================================
 REQUIRED_FIELDS = [
     "id", "location", "crisis_type", "location_category", "people_affected",
     "food_needed", "needs_refrigeration", "severity", "deadline", "submitted_at",
 ]
 
+#Every field a request must have
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class CrisisRequest:
     id: str                    # e.g. "R1"
@@ -26,7 +27,10 @@ class CrisisRequest:
     deadline: float            # minutes on the simulation clock
     submitted_at: float        # minutes on the simulation clock
 
+#One emergency food request, with every field already validated
+#=======================================================================================================================
 
+#=======================================================================================================================
 class RequestError(Exception):
     """Holds a list of every problem found, so the UI can show them all."""
 
@@ -34,17 +38,26 @@ class RequestError(Exception):
         self.errors = errors
         super().__init__("; ".join(errors))
 
+#Error that carries a list of every problem found, so the form can show them all at once
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _is_int(value):
     """True for whole numbers. Excludes True/False, which Python counts as ints."""
     return isinstance(value, int) and not isinstance(value, bool)
 
+#True for whole numbers; rejects True/False, which Python treats as 1 and 0
+#=======================================================================================================================
 
+#=======================================================================================================================
 def _is_num(value):
     """True for ints and decimals, but not True/False."""
     return isinstance(value, (int, float)) and not isinstance(value, bool)
 
+#True for whole numbers and decimals; also rejects True/False
+#=======================================================================================================================
 
+#=======================================================================================================================
 def validate_request(data, dataset):
     """Check a request dict. Return a CrisisRequest, or raise RequestError."""
     # 1. Missing fields: stop early, since later checks need every field.
@@ -89,3 +102,7 @@ def validate_request(data, dataset):
 
     # 3. Everything checked out. Copy only the known fields.
     return CrisisRequest(**{f: data[f] for f in REQUIRED_FIELDS})
+
+#Checks a request: missing fields first, then collects every bad value (type, range, real node, deadline after
+#submission) before raising the errors or returning a CrisisRequest
+#=======================================================================================================================

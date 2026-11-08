@@ -1,22 +1,14 @@
-"""Chaos mode: random disruptions while the clock runs.
-
-When switched on, every stretch of simulated time has a chance of random
-incidents (a road closing, a truck breaking down, or a surprise request).
-Closed roads reopen and broken trucks are repaired automatically after a
-while, so the city recovers and the demo keeps going.
-
-The dispatcher calls plan() when the clock moves and run_due() as time
-passes, so incidents happen at their own moments, not all at once.
-"""
-from __future__ import annotations  # lets newer type hints work on Python 3.8
-
 import random
 
+#======================================================================================================================
 LEVELS = {"low": 4, "medium": 10, "high": 20}     # incidents per simulated hour
-KINDS = [("road", 5), ("breakdown", 3), ("request", 2)]
-CRISIS_TYPES = ["flash flood", "building fire", "power outage", "gas leak",
+KINDS = [("road", 5), ("breakdown", 3), ("request", 2)] #Commonality of crisises occurring
+CRISIS_TYPES = ["flash flood", "building fire", "power outage", "gas leak", #Names of different Crises that pop up
                 "water main break", "heat wave"]
+#This block is designed just to establish the system in place for randomly generating chaos within the simulation
+#======================================================================================================================
 
+#======================================================================================================================
 
 class Chaos:
     def __init__(self, seed=None):
@@ -25,6 +17,12 @@ class Chaos:
         self.level = "medium"
         self.incidents = []       # times a random incident will happen
         self.recoveries = []      # (time, "reopen" | "repair", id)
+
+#General initialization of the "chaos" system as a whole, generates a random number via a seed,tracks the times
+#when incidents happen and the recovery times per process
+#======================================================================================================================
+
+#======================================================================================================================
 
     def set(self, enabled, level=None):
         if level is not None:
@@ -35,6 +33,10 @@ class Chaos:
         if not enabled:
             self.incidents = []   # cancel future incidents; recoveries still happen
 
+#The process to enable or disable the "chaos" simulation
+#======================================================================================================================
+
+#======================================================================================================================
     def plan(self, start, end):
         """Decide when incidents will happen between two clock times."""
         if not self.enabled or end <= start:
@@ -43,10 +45,22 @@ class Chaos:
         count = int(expected) + (1 if self.rng.random() < expected % 1 else 0)
         self.incidents += [self.rng.uniform(start, end) for _ in range(count)]
 
+#The way the "chaos" process decides when incidents shall happen in the simulation. The way the calculation works is:
+# rate x hours, rounded to the next available whole number. When the randomizer uses this function, it 
+#gives each incident as well a uniform time value to reflect real-life events in whole numbers
+#======================================================================================================================
+
+#======================================================================================================================
+
     def due_times(self, end):
         return [t for t in self.incidents if t <= end] + \
                [t for t, _, _ in self.recoveries if t <= end]
 
+#Process to list every incident and/or recovery event that is due over a given time frame. This is used by the 
+#program to stop the clock and accurately record when events are resolved.
+#======================================================================================================================
+
+#======================================================================================================================
     def run_due(self, d):
         """Carry out everything scheduled up to the dispatcher's current time."""
         now = d.now + 1e-9
@@ -61,6 +75,10 @@ class Chaos:
         for _ in due:
             self.trigger(d)
 
+#Carries out recoveries
+#======================================================================================================================
+
+#======================================================================================================================
     def trigger(self, d, kind=None):
         """One random incident right now. Returns a short description."""
         if kind is None:
@@ -77,7 +95,12 @@ class Chaos:
             kind = "request"
         return self._surprise_request(d)
 
+#Command to control the logic behind the "trigger crisis" button in dispatcher simulation menu
+#======================================================================================================================
+
     # ---------------------------------------------------------------- incident types
+
+#======================================================================================================================
     def _close_road(self, d):
         open_roads = [e for e in d.graph.edges if e not in d.graph.closed_edges]
         if len(d.graph.closed_edges) >= max(1, len(d.graph.edges) // 7) or not open_roads:
@@ -91,6 +114,10 @@ class Chaos:
         self.recoveries.append((d.now + self.rng.uniform(10, 40), "reopen", edge_id))
         return f"Closed road {edge_id}"
 
+# Closes a road (max 1/7 of all roads closed), 60% on a truck's route; reopens are preset in 10-40 min
+#======================================================================================================================
+
+#======================================================================================================================
     def _breakdown(self, d):
         healthy = [t for t in d.dataset.trucks if t not in d.pool.broken]
         if len(healthy) <= 2:
@@ -102,6 +129,10 @@ class Chaos:
         self.recoveries.append((d.now + self.rng.uniform(15, 45), "repair", truck_id))
         return f"Broke down {truck_id}"
 
+# Breaks a truck in the menu (must keep at least 2 working), 60% a busy one; preset repair timer in 15-45 min
+#======================================================================================================================
+
+#======================================================================================================================
     def _surprise_request(self, d):
         ds = d.dataset
         hub_nodes = {ds.pois[h].node for h in ds.hubs}
@@ -124,6 +155,14 @@ class Chaos:
         })
         return f"Surprise request {req.id}"
 
+#Generates a Random valid request at a real place (60%) or non-hub corner, submitted like any other into the system
+#======================================================================================================================
+
+#======================================================================================================================
+
     def status(self):
         return {"enabled": self.enabled, "level": self.level, "levels": list(LEVELS),
                 "pending_recoveries": len(self.recoveries)}
+
+# Chaos on/off, level and pending recoveries for the dispatcher console. What displays the toggle buttons
+#======================================================================================================================

@@ -1,201 +1,380 @@
 # Urban Food Crisis Response and Routing System
 
-Takes emergency food requests, decides which are most urgent, assigns food
-and trucks, plans routes around road closures, and tracks every emergency
-through a state machine, live on a dashboard. Works on any dataset in the
+## Administrative information
+
+| | |
+|---|---|
+| **Team name** | _["NKAMA!!!"]_ |
+| **Competitors** | _["Kosimasichukwu Ebegbulem"]_, _["Aashir Ahmed"]_, _["Mansur Hasan"]_ |
+| **Project title** | Urban Food Crisis Response and Routing System |
+| **Repository** | _[https://github.com/ichaival-01/NKAMA-_Programming_Code.git]_ |
+| **AI usage log** | [AI_USAGE.md](AI_USAGE.md) |
+
+---
+
+## Overview
+
+The program manages emergency food deliveries across a city. It is built
+around the competition's six requirements and runs on any dataset in the
 competition's JSON format without code changes.
 
-## Run it
+1. **Takes emergency requests.** People submit requests through a public web
+   page (location, crisis type, location type, people affected, food needed,
+   refrigeration, severity, deadline; submission time is stamped
+   automatically). Every field is validated, and all mistakes are reported at
+   once.
+2. **Triages them.** Each request gets a 0–100 urgency score from severity,
+   deadline (including travel time from the nearest hub), people affected,
+   location type and food needed. The score's breakdown is shown on screen.
+3. **Queues them fairly.** A heap-based priority queue puts the most urgent
+   first, adds a waiting-time boost so nobody waits forever, and re-scores
+   requests as deadlines approach and roads close.
+4. **Assigns food and trucks greedily.** The most urgent request gets the
+   fastest hub and truck that has enough of the right food (normal or cold),
+   enough capacity, refrigeration if needed, enough fuel, and an open route.
+   Nothing can be assigned to two emergencies at once.
+5. **Plans routes with A\*.** Trucks re-route around closed roads, wait when
+   a site is cut off, and resume when a road reopens.
+6. **Tracks every emergency** through nine states (Open, Prioritized,
+   Resource Assigned, In Progress, Re-Routing, Delivered, Resolved, Delayed,
+   Failed), logging the time and a reason for every change.
 
+Everything runs on a **simulation clock** that dispatchers control. A
+publish/subscribe **event bus** pushes every change to the dispatcher
+console live over a WebSocket. Disruptions can be triggered by hand or by
+**chaos mode** (random road closures, breakdowns and surprise requests), and
+trucks burn **fuel** and must stop to refuel.
+
+There are two web pages:
+
+| Page | Address | Who it's for |
+|---|---|---|
+| Public request page | http://127.0.0.1:8000/ | Anyone: send a request and follow **only your own** requests with a tracking code |
+| Dispatcher console | http://127.0.0.1:8000/dispatch | Dispatch staff (login required): every request, the queue, the fleet, the clock and the controls |
+
+---
+
+## How to install and run
+
+Python is interpreted, so there is no separate compile step: installing the
+dependencies and starting the server is all that's needed. These steps take
+about two minutes. **An internet connection is needed** the first time (to
+install packages) and while using the web pages (the map library, map tiles
+and fonts load from the web).
+
+### 1. Requirements
+
+- **Python 3.8 or newer** (tested on 3.8.3 and 3.13). During installation on
+  Windows, tick **"Add python.exe to PATH"**.
+- **Git** (only to download the code).
+
+### 2. Download the code
+
+```powershell
+git clone _[GitHub link]_
+cd _[repository folder name]_
+```
+
+### 3. Create a virtual environment and install the dependencies
+
+**Windows (PowerShell):**
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
+```
+If PowerShell says *running scripts is disabled*, run
+`Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` once, then activate again.
+
+**macOS / Linux:**
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+`(.venv)` appears at the start of the prompt when the environment is active.
+Activate it again in every new terminal.
+
+### 4. (Optional) Check everything works
+
+```powershell
+python -m pytest
+```
+All tests should pass (242 at the time of writing).
+
+### 5. Start the server
+
+```powershell
 python -m uvicorn server:app --reload
 ```
 
-There are two pages:
+Leave this terminal open. Then open:
+- **http://127.0.0.1:8000/** for the public page
+- **http://127.0.0.1:8000/dispatch** for the dispatcher console (see
+  [Dispatcher logins](#dispatcher-logins) below)
 
-| Page | Who it's for | What it does |
-|---|---|---|
-| http://127.0.0.1:8000/ | The public | Send a food request and follow **only your own** requests: progress steps, plain-language updates, arrival time, and your truck on the map |
-| http://127.0.0.1:8000/dispatch | Dispatch staff (password) | The full console: queue with score breakdowns, every crisis, the clock, road closures, breakdowns, fleet and stock, live event feed |
+Stop the server with `Ctrl+C`.
 
-### Dispatcher accounts
+### 6. Run with a different dataset (for example, Dataset 2)
 
-Each teammate gets their own login. Run this once per person (it asks for
-the password twice, minimum 8 characters):
+Point the server at the file; no code changes are needed.
 
+**Windows (PowerShell):**
+```powershell
+$env:DATASET = "data/dataset-2.json"
+python -m uvicorn server:app --reload
+```
+
+**macOS / Linux:**
+```bash
+DATASET=data/dataset-2.json python -m uvicorn server:app --reload
+```
+
+To go back to Toronto in PowerShell, close the terminal or run
+`Remove-Item Env:DATASET`.
+
+If a file of sample requests sits next to the dataset with `-requests` added
+to its name (for example `data/dataset-2-requests.json`), the console's
+**Load sample requests** button loads it. A different file can be chosen
+with `$env:REQUESTS = "path/to/requests.json"`.
+
+---
+
+## Dependencies
+
+### Python packages (installed by `pip install -r requirements.txt`)
+
+| Package | What it's used for |
+|---|---|
+| **FastAPI** | The web server: pages, the API and the WebSocket |
+| **Uvicorn** (with `[standard]` extras, which include **websockets**) | Runs the FastAPI server; the extras enable live WebSocket updates |
+| **pytest** | Runs the automated tests |
+| **httpx** | Lets the tests call the web server (used by FastAPI's test client) |
+
+### Python standard library (built in, nothing to install)
+
+`heapq` (priority queue and route search), `dataclasses`, `json`, `math`,
+`random` (chaos mode), `hashlib`, `hmac` and `secrets` (password hashing and
+login sessions), `getpass`, `datetime`, `pathlib`, `itertools`, `copy`.
+
+No machine-learning or data-analysis libraries (such as TensorFlow or
+Pandas) are used.
+
+### Web page libraries (loaded from the internet by the browser)
+
+| Library | What it's used for |
+|---|---|
+| **Leaflet 1.9.4** (from unpkg.com) | The interactive map |
+| **OpenStreetMap** map tiles | The street map behind the roads |
+| **Barlow** fonts (from Google Fonts) | Typography; the pages fall back to system fonts if offline |
+
+---
+
+## Operating the app
+
+### Dispatcher logins
+
+Each team member has their own login to the dispatcher console.
+
+**Create an account** (once per person, on the computer that runs the server):
 ```powershell
 python manage_users.py add aashi "Aashi"
-python manage_users.py list
-python manage_users.py remove aashi
 ```
+- `aashi` is the **username** used to log in (letters, numbers and `_`).
+- `"Aashi"` is the **display name** shown in the console and in the event
+  feed (for example "Road closed: Bloor St by Aashi").
+- It asks for the password twice. Passwords need at least 8 characters.
 
-Accounts are saved in `dispatchers.json`, which holds only salted password
-hashes (PBKDF2, 200,000 rounds), never the passwords. **Don't commit it**:
-it's listed in `.gitignore`. Each laptop that runs the server needs its own
-accounts (or a copy of the file passed around privately).
-
-Until the first account exists, a shared fallback login works: username
-`dispatcher`, password from `$env:DISPATCH_PASSWORD` (default `dispatch`).
-It switches off automatically once you add personal accounts.
-
-Other protections: sessions expire after 12 hours, and 5 wrong passwords
-from one computer lock it out for a minute. Console actions are signed with
-the person's name in the event feed, e.g. "Road closed: Bloor St by Aashi".
-
-For a quick demo: log in at `/dispatch`, click **Load sample requests**, then **Play**.
-Open `/` in another browser window to submit a request and watch it progress.
-
-**How the two sides stay separate.** Each request gets a tracking code like
-`R4-7F3A9C`. The public page only shows requests whose full code it holds
-(saved in that browser, or typed in), so ids like `R4` can't be guessed to
-spy on other requests. Every dispatcher API and the live WebSocket require
-the login cookie. The public view (`engine/public.py`) only exposes that one
-request's progress, never scores, other requests, stock or controls.
-Dispatchers can read a request's tracking code to someone who phoned it in.
-
-Use a different dataset (e.g. Dataset 2) without changing code:
-
+**Other account commands:**
 ```powershell
-$env:DATASET = "data/test-city.json"
-python -m uvicorn server:app --reload
+python manage_users.py list            # see all usernames
+python manage_users.py remove aashi    # delete an account
 ```
 
-Run the tests: `python -m pytest`
+**Logging in:** go to http://127.0.0.1:8000/dispatch and enter the username
+and password.
 
-## Requirements map
+**Things to know:**
+- Accounts are stored in `dispatchers.json` as salted password hashes; the
+  passwords themselves are never stored. This file is in `.gitignore` and
+  **must not be uploaded to GitHub**. Each computer that runs the server
+  needs its own accounts.
+- **Before any account exists**, a shared login works: username
+  `dispatcher`, password `dispatch`. It switches off automatically once the
+  first personal account is created. To give the shared login a different
+  password, set it before starting the server:
+  `$env:DISPATCH_PASSWORD = "your-password"`.
+- **Five wrong passwords** lock that computer out for one minute.
+- Sessions last **12 hours**, then the console asks for the login again.
+- A **forgotten password** can't be recovered. Remove the account and add it
+  again.
 
-| Requirement | Where it's met | Proven by |
+### Dispatcher console
+
+| Control | What it does |
+|---|---|
+| **Play / Pause** | Runs the simulation clock (speed: 1, 2 or 5 simulated minutes per second) |
+| **Skip 5 min / Skip 15 min** | Jumps the clock forward |
+| **Load sample requests** | Loads the demo requests for the current dataset |
+| **Chaos on / off**, with Low, Medium or High | Random road closures, truck breakdowns and surprise requests while the clock runs (about 4, 10 or 20 per simulated hour). Roads reopen and trucks are repaired on their own |
+| **Trigger incident** | Causes one random incident immediately |
+| **Reset** | Starts the simulation over (clears all requests and tracking codes) |
+| **Log out** | Ends your session |
+| **Click a road** on the map | Closes it (red dashed line). Click again to reopen it |
+| **Click a crisis site** on the map | Opens its details and timeline |
+
+**Tabs on the right:**
+- **Queue:** waiting requests, most urgent first. The bar shows how the
+  score breaks down (severity, deadline, people, location type, food,
+  waiting boost) and why the request is waiting.
+- **Crises:** every request with its state. Click one to see its full
+  timeline (each change with its time and reason) and its tracking code.
+- **New request:** enter a request by hand, for example one phoned in.
+  Leave **Submission time** blank for "now", or enter a later simulated time
+  to schedule it.
+- **Fleet:** food stock at each hub, and each truck's status and fuel.
+  **Break down** takes a truck out of service; **Repair** brings it back.
+
+The **event feed** under the map shows every event as it happens. Road
+closures, breakdowns, low stock and completed deliveries are also printed in
+the server's terminal.
+
+**A quick demonstration:** log in, click **Load sample requests**, press
+**Play**, then click a road that a truck is about to use. The truck
+re-routes and the request's timeline records it.
+
+### Public request page
+
+1. Open http://127.0.0.1:8000/, fill in the form and press **Send request**.
+2. A **tracking code** appears (for example `R4-D90B30`). The page then
+   shows that request's progress live: its step, a plain-language update,
+   the expected arrival, and the truck on the map.
+3. The browser remembers the code. To follow a request from another device,
+   type the code into **Have a tracking code?**.
+
+The public page never shows other people's requests or any dispatcher
+controls. A request's id alone (like `R4`) is not enough to see it; the full
+code is needed. Dispatchers can read the code from the **Crises** tab to give
+to someone who phoned a request in.
+
+### Tuning (`config.json`)
+
+| Setting | Default | Meaning |
 |---|---|---|
-| Crisis submission, all 9 fields incl. submission time, validation | `engine/crisis.py`, New request form | `test_crisis.py` |
-| Priority scoring (severity, people, food, deadline, location type, travel time), explainable | `engine/scoring.py`, Queue tab breakdown bars, Prioritized reason in each timeline | `test_scoring.py` |
-| Heap queue, updates on change, waiting-time aging, equal-priority rule | `engine/priority_queue.py`, re-scored every tick and on closures | `test_priority_queue.py`, `test_dispatcher.py` |
-| Dijkstra/A*, closures, alternatives, "route unavailable" | `engine/router.py`, re-routing in `dispatcher.py`, red "No route available" on the dashboard | `test_router.py`, `test_astar.py`, `test_dispatcher.py` |
-| Greedy matching (stock, capacity, refrigeration, urgency, route) without double-booking | `engine/matcher.py` + reservations | `test_matcher.py`, chaos test in `test_generality.py` |
-| All 9 states, valid transitions, Re-Routing only when needed, timestamp + reason on every change | `engine/states.py` (simulation time and real date-time logged) | `test_states.py`, `test_dispatcher.py` |
-| Pub/sub bus for all 7 events, shown live over WebSocket | `engine/events.py`; `server.py` subscribes the website and a terminal logger | `test_server.py` |
-| Works on a new dataset without code changes | `$env:DATASET`, `data/test-city.json` | `test_generality.py` |
+| `weights` | severity 30, deadline 25, people 20, location 15, food 10 | Maximum points per part of the score (they add up to 100) |
+| `location_weights` | hospital 1.0, shelter 0.8, community 0.6 | Share of the location points per type; other types get `default_location_weight` (0.5) |
+| `aging_rate` | 0.2 | Extra priority points per minute a request waits |
+| `fuel.per_km` | 6 | Fuel used per km driven (0 switches fuel off) |
+| `fuel.reserve` | 25 | Trucks refuel after a delivery when below this |
+| `fuel.refuel_minutes` | 10 | How long refuelling takes |
 
-## How it works
+Restart the server after changing `config.json`.
+
+### Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `python` is not recognized | Reinstall Python with "Add python.exe to PATH" ticked, or use `py` instead of `python` |
+| *Running scripts is disabled* when activating | `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned`, then activate again |
+| `No module named 'engine'` | Run commands from the project's top folder |
+| `Address already in use` | Another server is running. Stop it, or add `--port 8001` and use that port in the address |
+| The map is blank | Check the internet connection; the map library and tiles load from the web |
+| "Too many wrong passwords" | Wait one minute and try again |
+| Live updates don't appear | Reinstall with `pip install -r requirements.txt` (the WebSocket support comes from `uvicorn[standard]`) |
+
+---
+
+## How it's built
 
 ```
 request → validate → score → priority queue → greedy match → A* route → track states
  (crisis)            (scoring) (priority_queue)  (matcher)     (router)   (states)
-                 everything runs on a simulation clock in dispatcher.py
-           and every change is published on the event bus (events.py)
+                everything runs on a simulation clock in dispatcher.py
+          and every change is published on the event bus (events.py)
 ```
 
 | File | Job |
 |---|---|
 | `engine/loader.py` | Reads and validates the dataset JSON |
 | `engine/graph.py` | Roads as a graph; closed roads are a set of edge ids |
-| `engine/router.py` | A* (and the original Dijkstra, kept for comparison) |
-| `engine/crisis.py` | Request format and validation; reports every mistake at once |
-| `engine/scoring.py` | 0–100 triage score with a per-factor breakdown |
-| `engine/priority_queue.py` | Heap queue with waiting-time aging and fair tie-breaks |
-| `engine/matcher.py` | Greedy hub + truck choice; reservations prevent double-booking |
-| `engine/states.py` | The state machine; illegal transitions raise an error |
+| `engine/router.py` | A* (and Dijkstra, kept for comparison) |
+| `engine/crisis.py` | Request format and validation |
+| `engine/scoring.py` | Triage score with a per-factor breakdown |
+| `engine/priority_queue.py` | Heap queue with aging and tie-breaks |
+| `engine/matcher.py` | Greedy hub and truck choice; reservations; fuel checks |
+| `engine/states.py` | The state machine |
 | `engine/events.py` | Publish/subscribe event bus |
-| `engine/dispatcher.py` | Ties it all together on a simulation clock |
-| `engine/chaos.py` | Random closures, breakdowns and surprise requests, with recovery |
-| `engine/public.py` | Plain-language progress of one request, for the public page |
-| `auth.py`, `manage_users.py` | Dispatcher accounts, sessions, login lockout |
-| `server.py` | FastAPI: public endpoints, dispatcher login, WebSocket |
-| `static/public.*` | The public request and tracking page |
-| `static/index.html`, `app.js`, `style.css` | The dispatcher console |
-| `static/login.html` | Dispatcher login |
-| `config.json` | Scoring weights, aging rate, thresholds |
+| `engine/dispatcher.py` | Ties everything together on the simulation clock |
+| `engine/chaos.py` | Chaos mode |
+| `engine/public.py` | Plain-language progress of one request for the public page |
+| `auth.py`, `manage_users.py` | Dispatcher accounts, sessions and login lockout |
+| `server.py` | Web server: public endpoints, dispatcher API, WebSocket |
+| `static/public.*` | Public request page |
+| `static/index.html`, `app.js`, `style.css`, `login.html` | Dispatcher console and login |
+| `data/` | Datasets and sample requests |
+| `tests/` | Automated tests |
 
-## Design decisions
+### Requirements map
 
-**Scoring.** Five parts, weights adding to 100 (all in `config.json`):
-severity 30, deadline 25, people 20, location type 15, food needed 10.
-The deadline part uses *spare time*: deadline − now − travel time from the
-nearest hub, so a far-away site becomes urgent sooner. Location types a
-dataset introduces (e.g. "school") get a default weight instead of breaking.
+| Requirement | Where it's met | Tested in |
+|---|---|---|
+| Crisis submission with validation | `engine/crisis.py`, both request forms | `test_crisis.py` |
+| Explainable priority scoring | `engine/scoring.py`, Queue tab | `test_scoring.py` |
+| Heap queue, updates, aging, ties | `engine/priority_queue.py` | `test_priority_queue.py` |
+| Dijkstra / A*, closures, "no route available" | `engine/router.py`, `engine/dispatcher.py` | `test_router.py`, `test_astar.py`, `test_dispatcher.py` |
+| Greedy matching without double-booking | `engine/matcher.py` | `test_matcher.py`, `test_generality.py` |
+| Nine-state machine with timestamps and reasons | `engine/states.py` | `test_states.py`, `test_dispatcher.py` |
+| Pub/sub events shown live over WebSocket | `engine/events.py`, `server.py` | `test_server.py` |
+| Works on any dataset | `$env:DATASET`, `data/test-city.json` | `test_generality.py` |
 
-**Priority queue.** `heapq`, with priority = score + 0.2 × minutes waited.
-Because everyone ages at the same rate, the heap key
-`score − 0.2 × submitted_at` never changes as time passes, so aging needs no
-re-sorting. The score itself does change (deadlines approach, roads close),
-so queued requests are re-scored on every clock tick. Ties: earlier
-submission first, then first come first served. Updates use lazy deletion,
-the same stale-entry trick as Dijkstra.
+### Design decisions
 
-**Matching (greedy).** The most urgent request picks first and gets the
-fastest hub + truck combination that has enough of the right food
-(cold or normal), enough capacity, refrigeration if needed, and an open
-route. Ties prefer a regular truck over a refrigerated one, then the
-smallest truck that fits. Reserved trucks and food can't be given to anyone
-else until the delivery finishes or is cancelled.
+**Scoring.** The deadline part uses *spare time*: deadline − now − travel
+time from the nearest hub, so a far-away site becomes urgent sooner.
 
-**Routing (A\*).** Heuristic = straight-line distance ÷ the fastest
-straight-line speed of any road, measured from the data. This never
-overestimates, so A* returns exactly the same costs as Dijkstra (tested on
-every pair of nodes, with random closures). Measuring speed from road *km*
-would not be safe: some roads in Dataset 1 are slightly shorter than the
-straight line between their ends.
+**Priority queue.** Priority = score + 0.2 × minutes waited. Because every
+request ages at the same rate, the heap key `score − 0.2 × submitted_at`
+never changes over time, so aging needs no re-sorting. Scores themselves do
+change, so queued requests are re-scored on every clock tick. Ties go to the
+earlier submission, then first come, first served.
 
-**State machine.** Open → Prioritized → Resource Assigned → In Progress →
-Delivered → Resolved. Delayed when no resources are free or a truck will
-miss the deadline. Re-Routing only when a closed road is on a truck's
-remaining route; if no route exists, the truck waits (Delayed) and resumes
-when a road reopens. Failed when a request is still unserved
-`failure_grace` minutes after its deadline. Every change is logged with
-the simulation time and a reason.
+**Matching.** Ties prefer a regular truck over a refrigerated one (saving
+refrigerated trucks for cold food), then the smallest truck that fits.
 
-**Event bus.** The dispatcher only *publishes* events; it doesn't know who
-listens. The server *subscribes* twice: the website subscribes to every
-event and pushes each one to the browser over a WebSocket, and a terminal
-logger subscribes only to road closures, breakdowns, low stock and
-resolutions. Adding another listener (say, a text-message alert) means one
-more `subscribe` call, with no change to the engine.
+**Routing.** A*'s estimate is the straight-line distance divided by the
+fastest straight-line speed of any road, measured from the data. It never
+overestimates, so A* always finds the same cost as Dijkstra while searching
+about 55% fewer intersections on the Toronto map.
 
-**Fuel.** Each truck's tank starts at the dataset's `fuel` value. Driving
-burns `per_km` units per km (set in `config.json`), charged road by road as
-the truck actually drives, including detours. The matcher never sends a
-truck that can't finish the whole trip. After a delivery, a truck below the
-`reserve` refuels where it is and is out of service for `refuel_minutes`
-(10 by default). If no truck can afford a trip, the suitable idle trucks go
-to refuel. Set `per_km` to 0 to switch fuel off. To see refuelling quickly
-in a demo, raise `per_km` (e.g. 15).
+**State machine.** Re-Routing happens only when a closed road is on a
+truck's remaining route. A request is Failed when it is still unserved two
+hours (`failure_grace`) after its deadline.
 
-**Chaos mode.** A toggle on the console (Low / Medium / High = 4 / 10 / 20
-incidents per simulated hour). While the clock runs, it randomly closes a
-road (often one a truck is about to use), breaks down a truck (often a busy
-one), or adds a surprise request. Roads reopen after 10–40 minutes and
-trucks are repaired after 15–45, so the city recovers. It never closes more
-than a seventh of the roads or leaves fewer than two working trucks.
-**Trigger incident** causes one immediately. Chaos actions appear in the
-feed as "by Chaos".
-
-**Breakdowns.** Before reaching the hub, the reserved food goes back into
-stock. After loading, the load is written off and the replacement truck
+**Breakdowns.** Before a truck reaches the hub, its reserved food goes back
+into stock. After loading, the load is written off and the replacement truck
 collects fresh stock.
 
-## Known limits
+### Known limits
 
-- One truck per request; a load bigger than any truck waits and fails.
-  Splitting loads across trucks is a natural next step.
-- Food must come from a single hub.
-- The dataset doesn't define a fuel unit, so `per_km` is our assumption;
-  confirm with the coordinators. Trucks refuel where they stand.
-- Trucks re-route from the last intersection they passed.
+- One truck and one hub per request; a load bigger than any truck waits and
+  eventually fails.
+- The datasets don't define a unit for fuel, so `fuel.per_km` is our
+  assumption. Trucks refuel where they stand.
+- A truck re-routes from the last intersection it passed.
 
-## Datasets
+### Datasets
 
-- `data/toronto-downtown.json`: Dataset 1.
+- `data/toronto-downtown.json`: Dataset 1 (Downtown Toronto).
 - `data/toronto-downtown-requests.json`: sample requests for the demo.
 - `data/test-city.json`: a made-up city that differs on purpose
-  (non-sequential ids, new location kinds, highways and hills, a river with
-  two bridges, fewer hubs and trucks) to prove the system adapts.
-
-- To input new data sets, the process goes: 
-
-1. Input the data set into the /data folder
-2. $env:DATASET = "data/dataset-2.json"
-3. Start server
+  (non-sequential ids, new location types, highways and hills, a river with
+  two bridges, fewer hubs and trucks) to show the system adapts.
 
 
+### AI DISCLAIMER
+
+- The project was built using the assistance of Generative AI to help explain, debug and rebuild
+  portions of the project. This disclaimer is to demonstrate full transparency with the 
+  development life-cycle and credit Anthropic's Claude AI for assisting in the 
+  completion of the project.s
