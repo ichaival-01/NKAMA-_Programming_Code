@@ -370,6 +370,15 @@ collects fresh stock.
 - `data/test-city.json`: a made-up city that differs on purpose
   (non-sequential ids, new location types, highways and hills, a river with
   two bridges, fewer hubs and trucks) to show the system adapts.
+  (non-sequential ids, new location kinds, highways and hills, a river with
+  two bridges, fewer hubs and trucks) to prove the system adapts.
+
+- To input new data sets, the process goes: 
+
+1. Input the data set into the /data folder
+2. $env:DATASET = "data/dataset-2.json"
+3. Start server
+
 
 
 ### AI DISCLAIMER
