@@ -1,25 +1,12 @@
-"""Greedy resource matching (goal 3).
-
-For one request at a time (the one popped from the priority queue), try every
-hub that has enough of the right food, and every free truck that can carry it,
-and pick the combination that reaches the site fastest:
-
-    truck's current spot  ->  hub (load food)  ->  crisis site
-
-"Greedy" means we take the best option for this request right now and never
-revisit it, rather than planning all requests together. It's fast and easy to
-explain, and the queue makes sure the most urgent request chooses first.
-
-ResourcePool tracks what's left, so the same truck or the same food can never
-be given to two emergencies at once.
-"""
-from __future__ import annotations  # lets newer type hints work on Python 3.8
-
+#=======================================================================================================================
 from dataclasses import dataclass
 
 from engine.router import shortest_path
 
+#Imports dataclass for the result records and shortest_path (A*) for routing
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class Assignment:
     request_id: str
@@ -35,18 +22,27 @@ class Assignment:
     reason: str            # plain-language explanation for the dashboard
     km: float = 0.0        # distance of both legs, for fuel
 
+#A successful match: which hub, truck and food, both route legs, timing, distance and a reason for the dashboard
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class NoMatch:
     request_id: str
     reason: str            # why nothing could be assigned
     kind: str = "other"    # "stock", "truck", "fuel" or "route", so callers can react
 
+#A failed match, with the reason and its kind (stock, truck, fuel or route) so the dispatcher can react
+#=======================================================================================================================
 
+#=======================================================================================================================
 def route_km(graph, route):
     return sum(graph.edges[eid].km for eid in route.edge_ids)
 
+#Total km of a route, used to work out fuel
+#=======================================================================================================================
 
+#=======================================================================================================================
 class ResourcePool:
     def __init__(self, dataset, fuel_per_km=0.0):
         self.dataset = dataset
@@ -66,13 +62,26 @@ class ResourcePool:
         self.busy = {}         # truck id -> request id it's working on
         self.broken = set()    # trucks out of service after a breakdown
 
+#Live state of every truck and hub: stock (a copy of the dataset's), truck locations, busy, broken, refuelling and fuel
+#levels
+#=======================================================================================================================
+
+#=======================================================================================================================
     def is_free(self, truck_id):
         return (truck_id not in self.busy and truck_id not in self.broken
                 and truck_id not in self.refuelling)
 
+#True if a truck isn't busy, broken or refuelling
+#=======================================================================================================================
+
+#=======================================================================================================================
     def fuel_needed(self, km):
         return km * self.fuel_per_km
 
+#Fuel a trip of this many km needs
+#=======================================================================================================================
+
+#=======================================================================================================================
     def reserve(self, a):
         """Lock in an assignment: take the food, mark the truck busy."""
         if a.truck_id in self.busy:
@@ -84,16 +93,28 @@ class ResourcePool:
         self.stock[a.hub_id][a.stock_type] -= a.amount
         self.busy[a.truck_id] = a.request_id
 
+#Locks in an assignment: takes the food and marks the truck busy, so nothing is given out twice
+#=======================================================================================================================
+
+#=======================================================================================================================
     def release(self, a):
         """Undo a reservation (e.g. delivery failed or cancelled)."""
         self.stock[a.hub_id][a.stock_type] += a.amount
         del self.busy[a.truck_id]
 
+#Undoes a reservation: returns the food and frees the truck
+#=======================================================================================================================
+
+#=======================================================================================================================
     def complete(self, a, site):
         """Delivery finished: the food stays used, the truck is free at the site."""
         del self.busy[a.truck_id]
         self.truck_location[a.truck_id] = site
 
+#Finishes a delivery: the food stays used and the truck is free at the site
+#=======================================================================================================================
+
+#=======================================================================================================================
     def break_down(self, truck_id, location):
         """Take a truck out of service where it stopped."""
         self.busy.pop(truck_id, None)
@@ -101,10 +122,17 @@ class ResourcePool:
         self.broken.add(truck_id)
         self.truck_location[truck_id] = location
 
+#Takes a truck out of service where it stopped
+#=======================================================================================================================
+
+#=======================================================================================================================
     def repair(self, truck_id):
         self.broken.discard(truck_id)
 
+#Puts a broken truck back in service
+#=======================================================================================================================
 
+#=======================================================================================================================
 def find_match(req, pool, graph, now):
     """Return the best Assignment for this request, or a NoMatch with a reason."""
     ds = pool.dataset
@@ -175,3 +203,7 @@ def find_match(req, pool, graph, now):
                 f"fastest suitable option ({travel_time:.1f} min)"),
         km=route_km(graph, to_hub) + route_km(graph, to_site),
     )
+
+#Greedy match: keeps hubs with enough food and free suitable trucks, then tries every hub + truck pair and keeps the
+#fastest one with a route and enough fuel. Ties: don't waste a fridge truck, then the smallest truck, then file order
+#=======================================================================================================================

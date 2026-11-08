@@ -1,9 +1,11 @@
-from __future__ import annotations  # lets newer type hints work on Python 3.8
-
+#=======================================================================================================================
 import json
 from dataclasses import dataclass, field
 
+#Imports json to read the dataset file, and dataclass for the record types below
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class Node:
     id: int
@@ -11,7 +13,10 @@ class Node:
     lat: float
     lng: float
 
+#An intersection on the map: id, name and coordinates
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class Edge:
     id: int
@@ -23,6 +28,10 @@ class Edge:
     hwy: bool = False
     terrain: str = "urban"
 
+#A road between two nodes: length, travel time (cost, from "w"), street name, highway flag and terrain
+#=======================================================================================================================
+
+#=======================================================================================================================
 @dataclass  
 class POI:
     id: str
@@ -33,6 +42,10 @@ class POI:
     lng: float
     address: str = ""
 
+#A named place on the map (hub, hospital, shelter...) and the node it sits on
+#=======================================================================================================================
+
+#=======================================================================================================================
 @dataclass
 class Truck:
     id: str
@@ -42,13 +55,20 @@ class Truck:
     capacity: int
     fuel: float
 
+#A delivery truck: home node, refrigeration, capacity and fuel tank
+#=======================================================================================================================
+
+#=======================================================================================================================
 @dataclass
 class Hub:
     poi_id: str
     normal: int
     cold: int
 
+#Food stock held at a hub: normal and cold units
+#=======================================================================================================================
 
+#=======================================================================================================================
 @dataclass
 class Dataset:
     name: str
@@ -57,13 +77,18 @@ class Dataset:
     pois: dict           # P0 -> POIs'
     hubs: dict           # poi id (P0) -> Hubs
     trucks: dict         # V1 -> trucks
-    # TODO: pois, hubs, trucks
 
+#The whole loaded city, with each record type stored in a dict by id
+#=======================================================================================================================
 
+#=======================================================================================================================
 class DatasetError(Exception):
     pass
 
+#Error raised when the dataset file is missing data or has bad values
+#=======================================================================================================================
 
+#=======================================================================================================================
 def load_dataset(path):
     with open(path) as f:
         raw = json.load(f)
@@ -106,8 +131,8 @@ def load_dataset(path):
             km=item["km"],
             cost=w,
             street=item.get("street", ""),
-            hwy=item.get("hwy", False), #not needed rn but claude consumed the outline and mentioned this is a modifier
-            terrain=item.get("terrain", "urban"), #not needed rn but claude consumed the outline and mentioned this is a modifier
+            hwy=item.get("hwy", False),  # optional dataset extra; not used yet
+            terrain=item.get("terrain", "urban"),  # optional dataset extra; not used yet
         )
 
     pois = {}
@@ -115,7 +140,7 @@ def load_dataset(path):
         if item["id"] in pois:
             raise DatasetError(f"Duplicate POI id: {item['id']}")
         if item["node"] not in nodes:  # the POI's node must exist
-            raise DatasetError(f"POI {item['id']} is on missin  g node {item['node']}")
+            raise DatasetError(f"POI {item['id']} is on missing node {item['node']}")
         pois[item["id"]] = POI(
             id=item["id"], name=item["name"], kind=item["kind"],
             node=item["node"], lat=item["lat"], lng=item["lng"],
@@ -144,3 +169,7 @@ def load_dataset(path):
         name=raw.get("name", ""),
         nodes=nodes, edges=edges, pois=pois, hubs=hubs, trucks=trucks,
     )
+
+#Reads the JSON file, checks for missing sections, duplicate ids, unknown nodes and invalid costs, then builds every
+#record into one Dataset
+#=======================================================================================================================
